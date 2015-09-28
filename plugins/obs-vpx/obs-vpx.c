@@ -23,6 +23,7 @@
 #include <obs-module.h>
 
 #include "vpx/vpx_encoder.h"
+#include "vpx/vpx_image.h"
 #include "vpx/vp8cx.h"
 
 #define do_log(level, format, ...) \
@@ -42,6 +43,10 @@ struct obs_vpx {
 	vpx_codec_iface_t	*vpx_iface;
 	vpx_codec_enc_cfg_t	vpx_enc_cfg;
 	vpx_codec_flags_t 	vpx_enc_flags;
+
+	bool				is_img_allocated;
+	vpx_img_fmt_t 		img_fmt;
+	vpx_image_t 		img;
 
 	DARRAY(uint8_t)		packet_data;
 
@@ -64,7 +69,13 @@ static const char *obs_vpx_getname(void *unused)
 
 static void obs_vpx_destroy(void *data)
 {
+	struct obs_vpx *obsvpx = data;
 
+	if (obsvpx) {
+		if (obsvpx->is_img_allocated == true) {
+			vpx_img_free(&obsvpx->img);
+		}
+	}
 }
 
 static void obs_vpx_defaults(obs_data_t *settings)
@@ -93,6 +104,92 @@ static obs_properties_t *obs_vpx_props(void *unused)
 	return props;
 }
 
+/**
+ * libvpx uses a common structure to define configuration parameters between
+ * all of the codecs (VP8-VP10) it supports. However, it doesn't mean that all
+ * codecs support all options, so depending on what we support defines what
+ * we set.
+ *
+ * Right now this only supports VP8, but I've marked the VP8 specific options
+ * that I'm aware of in the source so this can be updated if and when VP9
+ * can actually encode in realtime without a machine catching fire
+ **/
+
+static void update_params(struct obs_vpx *obsvpx,obs_data_t *settings)
+{
+	video_t *video = obs_encoder_video(obsvpx->encoder);
+	const struct video_output_info *voi = video_output_get_info(video);
+	struct video_scale_info info;
+
+	vpx_codec_enc_cfg_t encoder_config = obsvpx->vpx_enc_cfg;
+
+	/* Configuration information from OBS */
+	int width        = (int)obs_encoder_get_width(obsvpx->encoder);
+	int height       = (int)obs_encoder_get_height(obsvpx->encoder);
+
+	/* Settings common to all codecs */
+	encoder_config.g_w = width;
+	encoder_config.g_h = height;
+
+	/**
+	 * I'm not sure if this a bug, or just plain weirdness from x264, but
+	 * VPx requires that the framerate numerator be greater then the the
+	 * denominator.
+	 *
+	 * x264 appears to work the other way: this is what I get in terms of
+	 * debug info from x264:
+	 *
+	 * fps_num:     30
+	 * fps_den:     1
+	 *
+	 * As such, we'll flip OBSes values to they're upside down so libvpx gets
+	 * values it considers sane.
+	 **/
+
+	encoder_config.g_timebase.den = voi->fps_num;
+	encoder_config.g_timebase.num = voi->fps_den;
+
+	/* VP8 doesn't use colorspaces; VP9 and 10 do; fill that info here  */
+
+	/**
+	 * libvpx defines a LOT of different image formats. However, the images
+	 * supported depend on the codec. VP8 is very limited; here's the
+	 * actual code that says what's allowed for VP8
+	 *
+	 *  From vp8/vp8_cx_iface.c:267
+	 *  switch (img->fmt)
+ 	 *	{
+	 *	case VPX_IMG_FMT_YV12:
+	 *	case VPX_IMG_FMT_I420:
+	 *	case VPX_IMG_FMT_VPXI420:
+	 *	case VPX_IMG_FMT_VPXYV12:
+	 * 		break;
+	 *	default:
+	 *		ERROR("Invalid image format. Only YV12 and I420 images are supported");
+     *  }
+	 *
+	 * As of writing, OBS supports NV12, I420, and I444 output, but it pops a
+	 * warning when anything but NV12 is selected that it will decrease
+	 * performance and said settings only exist for recording. For an alpha
+	 * this is fine, but I need to discuss with obs-devel how best to handle
+	 * this.
+	 **/
+
+	obsvpx->img_fmt = VPX_IMG_FMT_I420;
+
+	info("settings:\n"
+	     "\tfps_num:     %d\n"
+	     "\tfps_den:     %d\n"
+	     "\twidth:       %d\n"
+	     "\theight:      %d\n"
+		 "\timg_fmt      %d\n",
+		 encoder_config.g_timebase.num,
+		 encoder_config.g_timebase.den,
+		 encoder_config.g_w,
+		 encoder_config.g_h,
+		 obsvpx->img_fmt);
+}
+
 static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 {
 	char *codec		= bstrdup(obs_data_get_string(settings, "codec"));
@@ -112,6 +209,8 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 	 *    with all the settings we have interfaces for
 	 *
 	 * 3. Initialize the encoder with the codex and config structs
+	 *
+	 * 4. Initialize the image buffer
 	 */
 
 	/* Step 1: Get the codex initializer */
@@ -132,6 +231,31 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 		error("Building default config for libvpx failed");
 		goto fail;
 	}
+
+	/* Step 3: Configure based on the type of codec we're using */
+	update_params(obsvpx, settings);
+
+	/* Step 4: Create an image buffer for the encoder */
+	if (obsvpx->is_img_allocated == true) {
+		vpx_img_free(&obsvpx->img);
+	}
+
+	/**
+	 * Magic number explanation: 32
+	 *
+	 * The last number in vpx_img_alloc refers to the alignment of
+	 * the resulting memory block. Example documentation uses 1, but
+	 * this causes degraded performance because it misaligns the stack
+	 * (and on non-x86 platforms, would cause a bus fault).
+	 *
+	 * Found via these links.
+	 * https://code.google.com/p/webm/issues/detail?id=441:
+	 * https://chromium-review.googlesource.com/#/c/23091/1/vpxenc.c
+	 **/
+
+	vpx_img_alloc(&obsvpx->img, obsvpx->img_fmt, obsvpx->vpx_enc_cfg.g_w,
+										 	 	 obsvpx->vpx_enc_cfg.g_h,
+												 32);
 	return true;
 
 	fail:
@@ -149,6 +273,7 @@ static bool obs_vpx_update(void *data, obs_data_t *settings)
 static void *obs_vpx_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	struct obs_vpx *obsvpx = bzalloc(sizeof(struct obs_vpx));
+	obsvpx->is_img_allocated = false;
 	obsvpx->encoder = encoder;
 
 	/* Unlike h264, we don't have an initialization step */
