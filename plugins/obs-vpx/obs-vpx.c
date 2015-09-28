@@ -125,7 +125,7 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 
 	/* Step 2: Build a default config */
 	error_code = vpx_codec_enc_config_default(obsvpx->vpx_iface,
-											  obsvpx->vpx_enc_cfg,
+											  vpx_codec_vp8_cx(),
 											  0);
 
 	if (error_code != VPX_CODEC_OK) {
