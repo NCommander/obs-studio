@@ -38,10 +38,10 @@
 
 struct obs_vpx {
 	obs_encoder_t		*encoder;
-	vpx_codec_ctx_t 	*vpx_ctx;
+	vpx_codec_ctx_t 	vpx_ctx;
 	vpx_codec_iface_t	*vpx_iface;
-	vpx_codec_enc_cfg_t	*vpx_enc_cfg;
-	vpx_codec_flags_t 	*vpx_enc_flags;
+	vpx_codec_enc_cfg_t	vpx_enc_cfg;
+	vpx_codec_flags_t 	vpx_enc_flags;
 
 	DARRAY(uint8_t)		packet_data;
 
