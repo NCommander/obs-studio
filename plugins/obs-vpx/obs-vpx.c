@@ -32,6 +32,19 @@
 
 /* ------------------------------------------------------------------------- */
 
+struct obs_vpx {
+	obs_encoder_t          *encoder;
+
+	DARRAY(uint8_t)        packet_data;
+
+	uint8_t                *extra_data;
+	uint8_t                *sei;
+
+	size_t                 extra_data_size;
+	size_t                 sei_size;
+
+	os_performance_token_t *performance_token;
+};
 
 /* ------------------------------------------------------------------------- */
 
@@ -53,7 +66,11 @@ static void obs_vpx_defaults(obs_data_t *settings)
 
 static obs_properties_t *obs_vpx_props(void *unused)
 {
+	UNUSED_PARAMETER(unused);
 
+	obs_properties_t *props = obs_properties_create();
+
+	return props;
 }
 
 static void obs_vpx_video_info(void *data, struct video_scale_info *info);
@@ -66,7 +83,11 @@ static bool obs_vpx_update(void *data, obs_data_t *settings)
 
 static void *obs_vpx_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
+	struct obs_vpx *obsvpx = bzalloc(sizeof(struct obs_vpx));
+	obsvpx->encoder = encoder;
 
+	/* MC: The prototype declares void; why are we returning an object? */
+	return obsvpx;
 }
 
 static bool obs_vpx_encode(void *data, struct encoder_frame *frame,
