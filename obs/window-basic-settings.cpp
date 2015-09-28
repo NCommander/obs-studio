@@ -527,9 +527,6 @@ void OBSBasicSettings::LoadEncoderTypes()
 		const char *name = obs_encoder_get_display_name(type);
 		const char *codec = obs_get_encoder_codec(type);
 
-		if (strcmp(codec, "h264") != 0)
-			continue;
-
 		QString qName = QT_UTF8(name);
 		QString qType = QT_UTF8(type);
 
