@@ -97,6 +97,7 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 {
 	char *codec		= bstrdup(obs_data_get_string(settings, "codec"));
 	vpx_codec_iface_t* encoder;
+	vpx_codec_err_t error_code;
 
 	/* Dump out configuration information to console */
 	blog(LOG_INFO, "---------------------------------");
@@ -110,7 +111,7 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 	 * 2. Call vpx_codec_enc_config_default, and then populate the structure
 	 *    with all the settings we have interfaces for
 	 *
-	 * 3. Initialize the encoder with the codex and config sructs
+	 * 3. Initialize the encoder with the codex and config structs
 	 */
 
 	/* Step 1: Get the codex initializer */
@@ -122,6 +123,15 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 		goto fail;
 	}
 
+	/* Step 2: Build a default config */
+	error_code = vpx_codec_enc_config_default(obsvpx->vpx_iface,
+											  obsvpx->vpx_enc_cfg,
+											  0);
+
+	if (error_code != VPX_CODEC_OK) {
+		error("Building default config for libvpx failed");
+		goto fail;
+	}
 	return true;
 
 	fail:
@@ -140,6 +150,11 @@ static void *obs_vpx_create(obs_data_t *settings, obs_encoder_t *encoder)
 {
 	struct obs_vpx *obsvpx = bzalloc(sizeof(struct obs_vpx));
 	obsvpx->encoder = encoder;
+
+	/* Unlike h264, we don't have an initialization step */
+	if (!update_settings(obsvpx, settings)) {
+		warn("vpx failed to load settings; something probably is wrong");
+	}
 
 	/* MC: The prototype declares void; why are we returning an object? */
 	return obsvpx;
