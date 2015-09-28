@@ -116,7 +116,7 @@ static bool update_settings(struct obs_vpx *obsvpx, obs_data_t *settings)
 
 	/* Step 1: Get the codex initializer */
 
-	if (strncmp (codec, "vp8", 3)) {
+	if (strncmp (codec, "vp8", 3) == 0) {
 		encoder = vpx_codec_vp8_cx();
 	} else {
 		error("Unknown codex configuration!");
