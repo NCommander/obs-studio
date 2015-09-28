@@ -267,7 +267,15 @@ static void obs_vpx_video_info(void *data, struct video_scale_info *info);
 
 static bool obs_vpx_update(void *data, obs_data_t *settings)
 {
+	struct obs_vpx *obsvpx = data;
+	bool success = update_settings(obsvpx, settings);
 
+	if (!success) {
+		warn("reconfiguration of obs-vpx failed\n");
+		return false;
+	}
+
+	return true;
 }
 
 static void *obs_vpx_create(obs_data_t *settings, obs_encoder_t *encoder)
@@ -301,9 +309,25 @@ static bool obs_vpx_sei(void *data, uint8_t **sei, size_t *size)
 
 }
 
+/* VP8 is very limited in what it will accept */
+static inline bool valid_format(enum video_format format)
+{
+	return format == VIDEO_FORMAT_I420;
+}
+
 static void obs_vpx_video_info(void *data, struct video_scale_info *info)
 {
+	struct obs_vpx *obsvpx = data;
+	enum video_format pref_format;
 
+	pref_format = obs_encoder_get_preferred_video_format(obsvpx->encoder);
+
+	if (!valid_format(pref_format)) {
+		pref_format = valid_format(info->format) ?
+			info->format : VIDEO_FORMAT_NV12;
+	}
+
+	info->format = pref_format;
 }
 
 struct obs_encoder_info obs_vpx_encoder = {
