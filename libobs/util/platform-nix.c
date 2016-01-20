@@ -18,19 +18,21 @@
 #include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <dlfcn.h>
 #include <unistd.h>
 #include <glob.h>
 #include <time.h>
+#include <signal.h>
 
 #include "obsconfig.h"
 
 #if !defined(__APPLE__)
 #include <sys/times.h>
 #include <sys/wait.h>
-#include <signal.h>
 #include <spawn.h>
 #endif
 
@@ -241,6 +243,34 @@ bool os_file_exists(const char *path)
 	return access(path, F_OK) == 0;
 }
 
+size_t os_get_abs_path(const char *path, char *abspath, size_t size)
+{
+	size_t min_size = size < PATH_MAX ? size : PATH_MAX;
+	char newpath[PATH_MAX];
+	int ret;
+
+	if (!abspath)
+		return 0;
+
+	if (!realpath(path, newpath))
+		return 0;
+
+	ret = snprintf(abspath, min_size, "%s", newpath);
+	return ret >= 0 ? ret : 0;
+}
+
+char *os_get_abs_path_ptr(const char *path)
+{
+	char *ptr = bmalloc(512);
+
+	if (!os_get_abs_path(path, ptr, 512)) {
+		bfree(ptr);
+		ptr = NULL;
+	}
+
+	return ptr;
+}
+
 struct os_dir {
 	const char       *path;
 	DIR              *dir;
@@ -302,6 +332,17 @@ void os_closedir(os_dir_t *dir)
 		closedir(dir->dir);
 		bfree(dir);
 	}
+}
+
+int64_t os_get_free_space(const char *path)
+{
+	struct statvfs info;
+	int64_t ret = (int64_t)statvfs(path, &info);
+
+	if (ret == 0)
+		ret = (int64_t)info.f_bsize * (int64_t)info.f_bfree;
+
+	return ret;
 }
 
 struct posix_glob_info {
@@ -550,3 +591,8 @@ void os_inhibit_sleep_destroy(os_inhibit_t *info)
 }
 
 #endif
+
+void os_breakpoint()
+{
+	raise(SIGTRAP);
+}

@@ -508,27 +508,12 @@ void obs_key_combination_to_str(obs_key_combination_t combination,
 	}
 }
 
-static char *get_abs_path(const char *path)
-{
-	wchar_t wpath[512];
-	wchar_t wabspath[512];
-	char *abspath = NULL;
-	size_t len;
-
-	len = os_utf8_to_wcs(path, 0, wpath, 512);
-	if (!len)
-		return NULL;
-
-	if (_wfullpath(wabspath, wpath, 512) != NULL)
-		os_wcs_to_utf8_ptr(wabspath, 0, &abspath);
-	return abspath;
-}
+bool sym_initialize_called = false;
 
 void reset_win32_symbol_paths(void)
 {
 	static BOOL (WINAPI *sym_initialize_w)(HANDLE, const wchar_t*, BOOL);
 	static BOOL (WINAPI *sym_set_search_path_w)(HANDLE, const wchar_t*);
-	static BOOL (WINAPI *sym_refresh_module_list)(HANDLE);
 	static bool funcs_initialized = false;
 	static bool initialize_success = false;
 
@@ -551,20 +536,16 @@ void reset_win32_symbol_paths(void)
 		sym_initialize_w = (void*)GetProcAddress(mod, "SymInitializeW");
 		sym_set_search_path_w = (void*)GetProcAddress(mod,
 				"SymSetSearchPathW");
-		sym_refresh_module_list = (void*)GetProcAddress(mod,
-				"SymRefreshModuleList");
-		if (!sym_initialize_w || !sym_set_search_path_w ||
-				!sym_refresh_module_list)
+		if (!sym_initialize_w || !sym_set_search_path_w)
 			return;
 
-		sym_initialize_w(GetCurrentProcess(), NULL, false);
 		initialize_success = true;
 	}
 
 	if (!initialize_success)
 		return;
 
-	abspath = get_abs_path(".");
+	abspath = os_get_abs_path_ptr(".");
 	if (abspath)
 		da_push_back(paths, &abspath);
 
@@ -594,7 +575,7 @@ void reset_win32_symbol_paths(void)
 		}
 
 		if (!found) {
-			abspath = get_abs_path(path.array);
+			abspath = os_get_abs_path_ptr(path.array);
 			if (abspath)
 				da_push_back(paths, &abspath);
 		}
@@ -616,8 +597,15 @@ void reset_win32_symbol_paths(void)
 	if (path_str.array) {
 		os_utf8_to_wcs_ptr(path_str.array, path_str.len, &path_str_w);
 		if (path_str_w) {
-			BOOL test = sym_set_search_path_w(GetCurrentProcess(), path_str_w);
-			sym_refresh_module_list(GetCurrentProcess());
+			if (!sym_initialize_called) {
+				sym_initialize_w(GetCurrentProcess(),
+						path_str_w, false);
+				sym_initialize_called = true;
+			} else {
+				sym_set_search_path_w(GetCurrentProcess(),
+						path_str_w);
+			}
+
 			bfree(path_str_w);
 		}
 	}

@@ -40,6 +40,7 @@ typedef BOOL (WINAPI *STACKWALK64)(DWORD machine_type, HANDLE process,
 		PFUNCTION_TABLE_ACCESS_ROUTINE64 function_table_access_routine,
 		PGET_MODULE_BASE_ROUTINE64 get_module_base_routine,
 		PTRANSLATE_ADDRESS_ROUTINE64 translate_address);
+typedef BOOL (WINAPI *SYMREFRESHMODULELIST)(HANDLE process);
 
 typedef PVOID (WINAPI *SYMFUNCTIONTABLEACCESS64)(HANDLE process,
 		DWORD64 addr_base);
@@ -78,6 +79,7 @@ struct exception_handler_data {
 	SYMGETMODULEBASE64                    sym_get_module_base64;
 	SYMFROMADDR                           sym_from_addr;
 	SYMGETMODULEINFO64                    sym_get_module_info64;
+	SYMREFRESHMODULELIST                  sym_refresh_module_list;
 	STACKWALK64                           stack_walk64;
 	ENUMERATELOADEDMODULES64              enumerate_loaded_modules64;
 	MINIDUMPWRITEDUMP                     minidump_write_dump;
@@ -134,6 +136,7 @@ static inline bool get_dbghelp_imports(struct exception_handler_data *data)
 	GET_DBGHELP_IMPORT(sym_get_module_base64, "SymGetModuleBase64");
 	GET_DBGHELP_IMPORT(sym_from_addr, "SymFromAddrW");
 	GET_DBGHELP_IMPORT(sym_get_module_info64, "SymGetModuleInfo64");
+	GET_DBGHELP_IMPORT(sym_refresh_module_list, "SymRefreshModuleList");
 	GET_DBGHELP_IMPORT(stack_walk64, "StackWalk64");
 	GET_DBGHELP_IMPORT(enumerate_loaded_modules64,
 			"EnumerateLoadedModulesW64");
@@ -163,6 +166,8 @@ static inline void init_instruction_data(struct stack_trace *trace)
 	trace->frame.AddrStack.Mode = AddrModeFlat;
 }
 
+extern bool sym_initialize_called;
+
 static inline void init_sym_info(struct exception_handler_data *data)
 {
 	data->sym_set_options(
@@ -170,7 +175,10 @@ static inline void init_sym_info(struct exception_handler_data *data)
 			SYMOPT_FAIL_CRITICAL_ERRORS |
 			SYMOPT_LOAD_ANYTHING);
 
-	data->sym_initialize(data->process, NULL, true);
+	if (!sym_initialize_called)
+		data->sym_initialize(data->process, NULL, true);
+	else
+		data->sym_refresh_module_list(data->process);
 
 	data->sym_info = LocalAlloc(LPTR, sizeof(*data->sym_info) + 256);
 	data->sym_info->SizeOfStruct = sizeof(SYMBOL_INFO);
@@ -220,11 +228,11 @@ static BOOL CALLBACK enum_all_modules(PCTSTR module_name, DWORD64 module_base,
 	}
 
 #ifdef _WIN64
-	dstr_catf(&data->module_list, "%016"PRIX64"-%016"PRIX64" %s\n",
+	dstr_catf(&data->module_list, "%016"PRIX64"-%016"PRIX64" %s\r\n",
 			module_base, module_base + module_size,
 			name_utf8);
 #else
-	dstr_catf(&data->module_list, "%08"PRIX64"-%08"PRIX64" %s\n",
+	dstr_catf(&data->module_list, "%08"PRIX64"-%08"PRIX64" %s\r\n",
 			module_base, module_base + module_size,
 			name_utf8);
 #endif
@@ -240,11 +248,11 @@ static inline void init_module_info(struct exception_handler_data *data)
 
 static inline void write_header(struct exception_handler_data *data)
 {
-	dstr_catf(&data->str, "Unhandled exception: %x\n"
-			"Fault address: %"PRIX64" (%s)\n"
-			"libobs version: "OBS_VERSION"\n"
-			"Windows version: %d.%d build %d (revision %d)\n"
-			"CPU: %s\n\n",
+	dstr_catf(&data->str, "Unhandled exception: %x\r\n"
+			"Fault address: %"PRIX64" (%s)\r\n"
+			"libobs version: "OBS_VERSION"\r\n"
+			"Windows version: %d.%d build %d (revision %d)\r\n"
+			"CPU: %s\r\n\r\n",
 			data->exception->ExceptionRecord->ExceptionCode,
 			data->main_trace.instruction_ptr,
 			data->module_name.array,
@@ -315,17 +323,17 @@ static inline bool walk_stack(struct exception_handler_data *data,
 #ifdef _WIN64
 #define SUCCESS_FORMAT \
 	"%016I64X %016I64X %016I64X %016I64X " \
-	"%016I64X %016I64X %s!%s+0x%I64x\n"
+	"%016I64X %016I64X %s!%s+0x%I64x\r\n"
 #define FAIL_FORMAT \
 	"%016I64X %016I64X %016I64X %016I64X " \
-	"%016I64X %016I64X %s!0x%I64x\n"
+	"%016I64X %016I64X %s!0x%I64x\r\n"
 #else
 #define SUCCESS_FORMAT \
 	"%08.8I64X %08.8I64X %08.8I64X %08.8I64X " \
-	"%08.8I64X %08.8I64X %s!%s+0x%I64x\n"
+	"%08.8I64X %08.8I64X %s!%s+0x%I64x\r\n"
 #define FAIL_FORMAT \
 	"%08.8I64X %08.8I64X %08.8I64X %08.8I64X " \
-	"%08.8I64X %08.8I64X %s!0x%I64x\n"
+	"%08.8I64X %08.8I64X %s!0x%I64x\r\n"
 
 	trace->frame.AddrStack.Offset &= 0xFFFFFFFFF;
 	trace->frame.AddrPC.Offset &= 0xFFFFFFFFF;
@@ -361,20 +369,23 @@ static inline bool walk_stack(struct exception_handler_data *data,
 #ifdef _WIN64
 #define TRACE_TOP \
 	"Stack            EIP              Arg0             " \
-	"Arg1             Arg2             Arg3             Address\n"
+	"Arg1             Arg2             Arg3             Address\r\n"
 #else
 #define TRACE_TOP \
 	"Stack    EIP      Arg0     " \
-	"Arg1     Arg2     Arg3     Address\n"
+	"Arg1     Arg2     Arg3     Address\r\n"
 #endif
 
 static inline void write_thread_trace(struct exception_handler_data *data,
-		THREADENTRY32 *entry)
+		THREADENTRY32 *entry, bool first_thread)
 {
 	bool crash_thread = entry->th32ThreadID == GetCurrentThreadId();
 	struct stack_trace trace = {0};
 	struct stack_trace *ptrace;
 	HANDLE thread;
+
+	if (first_thread != crash_thread)
+		return;
 
 	if (entry->th32OwnerProcessID != GetCurrentProcessId())
 		return;
@@ -387,7 +398,7 @@ static inline void write_thread_trace(struct exception_handler_data *data,
 	GetThreadContext(thread, &trace.context);
 	init_instruction_data(&trace);
 
-	dstr_catf(&data->str, "\nThread %lX%s\n"TRACE_TOP,
+	dstr_catf(&data->str, "\r\nThread %lX%s\r\n"TRACE_TOP,
 			entry->th32ThreadID,
 			crash_thread ? " (Crashed)" : "");
 
@@ -409,10 +420,16 @@ static inline void write_thread_traces(struct exception_handler_data *data)
 		return;
 
 	entry.dwSize = sizeof(entry);
-	success = !!Thread32First(snapshot, &entry);
 
+	success = !!Thread32First(snapshot, &entry);
 	while (success) {
-		write_thread_trace(data, &entry);
+		write_thread_trace(data, &entry, true);
+		success = !!Thread32Next(snapshot, &entry);
+	}
+
+	success = !!Thread32First(snapshot, &entry);
+	while (success) {
+		write_thread_trace(data, &entry, false);
 		success = !!Thread32Next(snapshot, &entry);
 	}
 
@@ -421,11 +438,11 @@ static inline void write_thread_traces(struct exception_handler_data *data)
 
 static inline void write_module_list(struct exception_handler_data *data)
 {
-	dstr_cat(&data->str, "\nLoaded modules:\n");
+	dstr_cat(&data->str, "\r\nLoaded modules:\r\n");
 #ifdef _WIN64
-	dstr_cat(&data->str, "Base Address                      Module\n");
+	dstr_cat(&data->str, "Base Address                      Module\r\n");
 #else
-	dstr_cat(&data->str, "Base Address      Module\n");
+	dstr_cat(&data->str, "Base Address      Module\r\n");
 #endif
 	dstr_cat_dstr(&data->str, &data->module_list);
 }

@@ -14,16 +14,8 @@
                     "url": "rtmp://live-hkg.twitch.tv/app"
                 },
                 {
-                    "name": "Asia: Hong Kong (2)",
-                    "url": "rtmp://live-hkg-2.twitch.tv/app"
-                },
-                {
                     "name": "Asia: Seoul, South Korea",
                     "url": "rtmp://live-sel.twitch.tv/app"
-                },
-                {
-                    "name": "Asia: Seoul, South Korea (2)",
-                    "url": "rtmp://live-sel-2.twitch.tv/app"
                 },
                 {
                     "name": "Asia: Singapore",
@@ -32,10 +24,6 @@
                 {
                     "name": "Asia: Taipei, Taiwan",
                     "url": "rtmp://live-tpe.twitch.tv/app"
-                },
-                {
-                    "name": "Asia: Tokyo (2), Japan",
-                    "url": "rtmp://live-tyo-2.twitch.tv/app"
                 },
                 {
                     "name": "Asia: Tokyo, Japan",
@@ -68,6 +56,14 @@
                 {
                     "name": "EU: Stockholm, SE",
                     "url": "rtmp://live-arn.twitch.tv/app"
+                },
+                {
+                    "name": "South America: Argentina",
+                    "url": "rtmp://live-eze.twitch.tv/app"
+                },
+                {
+                    "name": "South America: Chile",
+                    "url": "rtmp://live-scl.twitch.tv/app"
                 },
                 {
                     "name": "South America: Rio de Janeiro, Brazil",
@@ -216,9 +212,9 @@
             ],
             "recommended": {
                 "keyint": 2,
-                "profile": "main",
+                "profile": "high",
                 "max video bitrate": 3500,
-                "max audio bitrate": 160
+                "max audio bitrate": 320
             }
         },
         {
@@ -319,6 +315,47 @@
             ]
         },
         {
+            "name": "JOICASTER",
+            "servers": [
+                {
+                    "name": "U.S. - Washington, DC",
+                    "url": "rtmp://ingest-1.wdc01.joicaster.co/live"
+                },
+                {
+                    "name": "U.S. - Dallas, TX",
+                    "url": "rtmp://ingest-1.dal09.joicaster.co/live"
+                },
+                {
+                    "name": "U.S. - Seattle, WA",
+                    "url": "rtmp://ingest-1.sea01.joicaster.co/live"
+                },
+                {
+                    "name": "C.A. - Toronto, Canada",
+                    "url": "rtmp://ingest-1.tor01.joicaster.co/live"
+                },
+                {
+                    "name": "E.U. - London, England",
+                    "url": "rtmp://ingest-1.lon02.joicaster.co/live"
+                },
+                {
+                    "name": "E.U. - Amsterdam, Netherlands",
+                    "url": "rtmp://ingest-1.ams03.joicaster.co/live"
+                },
+                {
+                    "name": "A.S. - Tokyo, Japan",
+                    "url": "rtmp://ingest-1.tok02.joicaster.co/live"
+                },
+                {
+                    "name": "A.U. - Melbourne, Australia",
+                    "url": "rtmp://ingest-1.mel01.joicaster.co/live"
+                },
+                {
+                    "name": "S.A - São Paulo, Brazil",
+                    "url": "rtmp://ingest-1.sao01.joicaster.co/live"
+                }
+            ]
+        },
+        {
             "name": "GoodGame.ru",
             "servers": [
                 {
@@ -380,15 +417,6 @@
                 {
                     "name": "Default",
                     "url": "rtmp://stream.connectcast.tv/live"
-                }
-            ]
-        },
-        {
-            "name": "iNSTAGIB.tv",
-            "servers": [
-                {
-                    "name": "US Chicago (Primary)",
-                    "url": "rtmp://live.instagib.tv:443/live"
                 }
             ]
         },
