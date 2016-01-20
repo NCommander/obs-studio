@@ -72,9 +72,14 @@ EXPORT int  os_sem_wait(os_sem_t *sem);
 
 EXPORT long os_atomic_inc_long(volatile long *val);
 EXPORT long os_atomic_dec_long(volatile long *val);
+EXPORT long os_atomic_set_long(volatile long *ptr, long val);
+EXPORT long os_atomic_load_long(const volatile long *ptr);
 
 EXPORT bool os_atomic_compare_swap_long(volatile long *val,
 		long old_val, long new_val);
+
+EXPORT bool os_atomic_set_bool(volatile bool *ptr, bool val);
+EXPORT bool os_atomic_load_bool(const volatile bool *ptr);
 
 EXPORT void os_set_thread_name(const char *name);
 

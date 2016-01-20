@@ -212,10 +212,12 @@ set(libobs_mediaio_HEADERS
 	media-io/format-conversion.h
 	media-io/audio-resampler.h
 	media-io/video-scaler.h
-	media-io/media-remux.h)
+	media-io/media-remux.h
+	media-io/frame-rate.h)
 
 set(libobs_util_SOURCES
 	util/array-serializer.c
+	util/file-serializer.c
 	util/base.c
 	util/platform.c
 	util/cf-lexer.c
@@ -224,12 +226,15 @@ set(libobs_util_SOURCES
 	util/lexer.c
 	util/dstr.c
 	util/utf8.c
+	util/crc32.c
 	util/text-lookup.c
 	util/cf-parser.c
 	util/profiler.c)
 set(libobs_util_HEADERS
 	util/array-serializer.h
+	util/file-serializer.h
 	util/utf8.h
+	util/crc32.h
 	util/base.h
 	util/text-lookup.h
 	util/vc/vc_inttypes.h
@@ -237,6 +242,7 @@ set(libobs_util_HEADERS
 	util/vc/vc_stdint.h
 	util/bmem.h
 	util/c99defs.h
+	util/util_uint128.h
 	util/cf-parser.h
 	util/threading.h
 	util/pipe.h

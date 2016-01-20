@@ -428,6 +428,10 @@ bool SimpleOutput::StartRecording()
 			"SimpleOutput", "FilePath");
 	const char *format = config_get_string(main->Config(),
 			"SimpleOutput", "RecFormat");
+	const char *mux = config_get_string(main->Config(), "SimpleOutput",
+			"MuxerCustom");
+	bool noSpace = config_get_bool(main->Config(), "SimpleOutput",
+			"FileNameWithoutSpace");
 
 	os_dir_t *dir = path ? os_opendir(path) : nullptr;
 
@@ -447,7 +451,8 @@ bool SimpleOutput::StartRecording()
 	if (lastChar != '/' && lastChar != '\\')
 		strPath += "/";
 
-	strPath += GenerateTimeDateFilename(ffmpegOutput ? "avi" : format);
+	strPath += GenerateTimeDateFilename(ffmpegOutput ? "avi" : format,
+			noSpace);
 
 	SetupOutputs();
 
@@ -459,6 +464,7 @@ bool SimpleOutput::StartRecording()
 	obs_data_t *settings = obs_data_create();
 	obs_data_set_string(settings, ffmpegOutput ? "url" : "path",
 			strPath.c_str());
+	obs_data_set_string(settings, "muxer_settings", mux);
 
 	obs_output_update(fileOutput, settings);
 
@@ -711,6 +717,8 @@ inline void AdvancedOutput::SetupRecording()
 {
 	const char *path = config_get_string(main->Config(), "AdvOut",
 			"RecFilePath");
+	const char *mux = config_get_string(main->Config(), "AdvOut",
+			"RecMuxerCustom");
 	bool rescale = config_get_bool(main->Config(), "AdvOut",
 			"RecRescale");
 	const char *rescaleRes = config_get_string(main->Config(), "AdvOut",
@@ -744,6 +752,7 @@ inline void AdvancedOutput::SetupRecording()
 	}
 
 	obs_data_set_string(settings, "path", path);
+	obs_data_set_string(settings, "muxer_settings", mux);
 	obs_output_update(fileOutput, settings);
 	obs_data_release(settings);
 }
@@ -925,6 +934,7 @@ bool AdvancedOutput::StartRecording()
 {
 	const char *path;
 	const char *format;
+	bool noSpace = false;
 
 	if (!useStreamEncoder) {
 		if (!ffmpegOutput) {
@@ -944,6 +954,10 @@ bool AdvancedOutput::StartRecording()
 				ffmpegRecording ? "FFFilePath" : "RecFilePath");
 		format = config_get_string(main->Config(), "AdvOut",
 				ffmpegRecording ? "FFExtension" : "RecFormat");
+		noSpace = config_get_bool(main->Config(), "AdvOut",
+				ffmpegRecording ?
+				"FFFileNameWithoutSpace" :
+				"RecFileNameWithoutSpace");
 
 		os_dir_t *dir = path ? os_opendir(path) : nullptr;
 
@@ -963,7 +977,7 @@ bool AdvancedOutput::StartRecording()
 		if (lastChar != '/' && lastChar != '\\')
 			strPath += "/";
 
-		strPath += GenerateTimeDateFilename(format);
+		strPath += GenerateTimeDateFilename(format, noSpace);
 
 		obs_data_t *settings = obs_data_create();
 		obs_data_set_string(settings,

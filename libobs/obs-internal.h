@@ -55,32 +55,18 @@ static inline bool obs_object_valid(const void *obj, const char *f,
 		const char *t)
 {
 	if (!obj) {
-		blog(LOG_WARNING, "Null %s passed to %s!", t, f);
+		blog(LOG_DEBUG, "%s: Null '%s' parameter", f, t);
 		return false;
 	}
 
 	return true;
 }
 
-static inline bool obs_source_valid(const obs_source_t *obj, const char *f)
-{
-	return obs_object_valid(obj, f, "source");
-}
-
-static inline bool obs_output_valid(const obs_output_t *obj, const char *f)
-{
-	return obs_object_valid(obj, f, "output");
-}
-
-static inline bool obs_encoder_valid(const obs_encoder_t *obj, const char *f)
-{
-	return obs_object_valid(obj, f, "encoder");
-}
-
-static inline bool obs_service_valid(const obs_service_t *obj, const char *f)
-{
-	return obs_object_valid(obj, f, "service");
-}
+#define obs_ptr_valid(ptr, func) obs_object_valid(ptr, func, #ptr)
+#define obs_source_valid  obs_ptr_valid
+#define obs_output_valid  obs_ptr_valid
+#define obs_encoder_valid obs_ptr_valid
+#define obs_service_valid obs_ptr_valid
 
 /* ------------------------------------------------------------------------- */
 /* modules */
@@ -283,10 +269,8 @@ struct obs_core_audio {
 
 /* user sources, output channels, and displays */
 struct obs_core_data {
-	pthread_mutex_t                 user_sources_mutex;
-	DARRAY(struct obs_source*)      user_sources;
-
 	struct obs_source               *first_source;
+	struct obs_source               *first_audio_source;
 	struct obs_display              *first_display;
 	struct obs_output               *first_output;
 	struct obs_encoder              *first_encoder;
@@ -297,10 +281,9 @@ struct obs_core_data {
 	pthread_mutex_t                 outputs_mutex;
 	pthread_mutex_t                 encoders_mutex;
 	pthread_mutex_t                 services_mutex;
+	pthread_mutex_t                 audio_sources_mutex;
 
 	struct obs_view                 main_view;
-
-	volatile long                   active_transitions;
 
 	long long                       unnamed_index;
 
@@ -512,6 +495,8 @@ struct obs_source {
 	/* audio */
 	bool                            audio_failed;
 	bool                            muted;
+	struct obs_source               *next_audio_source;
+	struct obs_source               **prev_next_audio_source;
 	struct resample_info            sample_info;
 	audio_resampler_t               *resampler;
 	audio_line_t                    *audio_line;
