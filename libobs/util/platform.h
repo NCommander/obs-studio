@@ -51,6 +51,9 @@ EXPORT char *os_quick_read_mbs_file(const char *path);
 EXPORT bool os_quick_write_mbs_file(const char *path, const char *str,
 		size_t len);
 
+EXPORT int64_t os_get_file_size(const char *path);
+EXPORT int64_t os_get_free_space(const char *path);
+
 EXPORT size_t os_mbs_to_wcs(const char *str, size_t str_len, wchar_t *dst,
 		size_t dst_size);
 EXPORT size_t os_utf8_to_wcs(const char *str, size_t len, wchar_t *dst,
@@ -100,6 +103,9 @@ EXPORT int os_get_config_path(char *dst, size_t size, const char *name);
 EXPORT char *os_get_config_path_ptr(const char *name);
 
 EXPORT bool os_file_exists(const char *path);
+
+EXPORT size_t os_get_abs_path(const char *path, char *abspath, size_t size);
+EXPORT char *os_get_abs_path_ptr(const char *path);
 
 struct os_dir;
 typedef struct os_dir os_dir_t;
@@ -151,6 +157,8 @@ typedef struct os_inhibit_info os_inhibit_t;
 EXPORT os_inhibit_t *os_inhibit_sleep_create(const char *reason);
 EXPORT bool os_inhibit_sleep_set_active(os_inhibit_t *info, bool active);
 EXPORT void os_inhibit_sleep_destroy(os_inhibit_t *info);
+
+EXPORT void os_breakpoint(void);
 
 #ifdef _MSC_VER
 #define strtoll _strtoi64

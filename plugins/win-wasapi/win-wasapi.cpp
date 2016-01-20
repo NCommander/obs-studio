@@ -486,7 +486,13 @@ static const char *GetWASAPIOutputName(void*)
 	return obs_module_text("AudioOutput");
 }
 
-static void GetWASAPIDefaults(obs_data_t *settings)
+static void GetWASAPIDefaultsInput(obs_data_t *settings)
+{
+	obs_data_set_default_string(settings, OPT_DEVICE_ID, "default");
+	obs_data_set_default_bool(settings, OPT_USE_DEVICE_TIMING, false);
+}
+
+static void GetWASAPIDefaultsOutput(obs_data_t *settings)
 {
 	obs_data_set_default_string(settings, OPT_DEVICE_ID, "default");
 	obs_data_set_default_bool(settings, OPT_USE_DEVICE_TIMING, true);
@@ -529,7 +535,6 @@ static obs_properties_t *GetWASAPIProperties(bool input)
 	obs_properties_t *props = obs_properties_create();
 	vector<AudioDeviceInfo> devices;
 
-	/* TODO: translate */
 	obs_property_t *device_prop = obs_properties_add_list(props,
 			OPT_DEVICE_ID, obs_module_text("Device"),
 			OBS_COMBO_TYPE_LIST, OBS_COMBO_FORMAT_STRING);
@@ -572,7 +577,7 @@ void RegisterWASAPIInput()
 	info.create          = CreateWASAPIInput;
 	info.destroy         = DestroyWASAPISource;
 	info.update          = UpdateWASAPISource;
-	info.get_defaults    = GetWASAPIDefaults;
+	info.get_defaults    = GetWASAPIDefaultsInput;
 	info.get_properties  = GetWASAPIPropertiesInput;
 	obs_register_source(&info);
 }
@@ -587,7 +592,7 @@ void RegisterWASAPIOutput()
 	info.create          = CreateWASAPIOutput;
 	info.destroy         = DestroyWASAPISource;
 	info.update          = UpdateWASAPISource;
-	info.get_defaults    = GetWASAPIDefaults;
+	info.get_defaults    = GetWASAPIDefaultsOutput;
 	info.get_properties  = GetWASAPIPropertiesOutput;
 	obs_register_source(&info);
 }

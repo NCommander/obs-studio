@@ -48,6 +48,12 @@ static struct obs_source_info freetype2_source_info = {
 
 bool obs_module_load()
 {
+	char *config_dir = obs_module_config_path(NULL);
+	if (config_dir) {
+		os_mkdirs(config_dir);
+		bfree(config_dir);
+	}
+
 	FT_Init_FreeType(&ft2_lib);
 
 	if (ft2_lib == NULL) {
@@ -55,7 +61,8 @@ bool obs_module_load()
 		return false;
 	}
 
-	load_os_font_list();
+	if (!load_cached_os_font_list())
+		load_os_font_list();
 
 	obs_register_source(&freetype2_source_info);
 
@@ -220,6 +227,7 @@ static void ft2_video_tick(void *data, float seconds)
 			else
 				load_text_from_file(srcdata,
 					srcdata->text_file);
+			cache_glyphs(srcdata, srcdata->text);
 			set_up_vertex_buffer(srcdata);
 		}
 	}
@@ -336,6 +344,7 @@ static void ft2_source_update(void *data, obs_data_t *settings)
 		srcdata->font_name = NULL;
 		srcdata->font_style = NULL;
 		srcdata->max_h = 0;
+		vbuf_needs_update = true;
 	}
 
 	srcdata->font_name  = bstrdup(font_name);

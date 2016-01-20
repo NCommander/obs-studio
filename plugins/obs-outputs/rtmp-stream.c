@@ -26,6 +26,12 @@
 #include "librtmp/log.h"
 #include "flv-mux.h"
 
+#ifdef _WIN32
+#include <Iphlpapi.h>
+#else
+#include <sys/ioctl.h>
+#endif
+
 #define do_log(level, format, ...) \
 	blog(level, "[rtmp stream: '%s'] " format, \
 			obs_output_get_name(stream->output), ##__VA_ARGS__)
@@ -35,6 +41,7 @@
 #define debug(format, ...) do_log(LOG_DEBUG,   format, ##__VA_ARGS__)
 
 #define OPT_DROP_THRESHOLD "drop_threshold_ms"
+#define OPT_MAX_SHUTDOWN_TIME_SEC "max_shutdown_time_sec"
 
 //#define TEST_FRAMEDROPS
 
@@ -45,11 +52,14 @@ struct rtmp_stream {
 	struct circlebuf packets;
 	bool             sent_headers;
 
-	bool             connecting;
+	volatile bool    connecting;
 	pthread_t        connect_thread;
 
-	bool             active;
+	volatile bool    active;
+	volatile bool    disconnected;
 	pthread_t        send_thread;
+
+	int              max_shutdown_time_sec;
 
 	os_sem_t         *send_sem;
 	os_event_t       *stop_event;
@@ -85,23 +95,65 @@ static void log_rtmp(int level, const char *format, va_list args)
 	blogva(LOG_INFO, format, args);
 }
 
+static inline size_t num_buffered_packets(struct rtmp_stream *stream);
+
 static inline void free_packets(struct rtmp_stream *stream)
 {
+	size_t num_packets;
+
+	pthread_mutex_lock(&stream->packets_mutex);
+
+	num_packets = num_buffered_packets(stream);
+	if (num_packets)
+		info("Freeing %d remaining packets", (int)num_packets);
+
 	while (stream->packets.size) {
 		struct encoder_packet packet;
 		circlebuf_pop_front(&stream->packets, &packet, sizeof(packet));
 		obs_free_encoder_packet(&packet);
 	}
+	pthread_mutex_unlock(&stream->packets_mutex);
 }
 
-static void rtmp_stream_stop(void *data);
+static inline bool stopping(struct rtmp_stream *stream)
+{
+	return os_event_try(stream->stop_event) != EAGAIN;
+}
+
+static inline bool connecting(struct rtmp_stream *stream)
+{
+	return os_atomic_load_bool(&stream->connecting);
+}
+
+static inline bool active(struct rtmp_stream *stream)
+{
+	return os_atomic_load_bool(&stream->active);
+}
+
+static inline bool disconnected(struct rtmp_stream *stream)
+{
+	return os_atomic_load_bool(&stream->disconnected);
+}
 
 static void rtmp_stream_destroy(void *data)
 {
 	struct rtmp_stream *stream = data;
 
-	if (stream->connecting || stream->active)
-		rtmp_stream_stop(data);
+	if (stopping(stream) && !connecting(stream)) {
+		pthread_join(stream->send_thread, NULL);
+
+	} else if (connecting(stream) || active(stream)) {
+		if (stream->connecting)
+			pthread_join(stream->connect_thread, NULL);
+
+		os_event_signal(stream->stop_event);
+
+		if (active(stream)) {
+			os_sem_post(stream->send_sem);
+			obs_output_end_data_capture(stream->output);
+			pthread_join(stream->send_thread, NULL);
+		}
+	}
 
 	if (stream) {
 		free_packets(stream);
@@ -144,23 +196,19 @@ fail:
 static void rtmp_stream_stop(void *data)
 {
 	struct rtmp_stream *stream = data;
-	void *ret;
+
+	if (stopping(stream))
+		return;
+
+	if (connecting(stream))
+		pthread_join(stream->connect_thread, NULL);
 
 	os_event_signal(stream->stop_event);
 
-	if (stream->connecting)
-		pthread_join(stream->connect_thread, &ret);
-
-	if (stream->active) {
+	if (active(stream)) {
 		os_sem_post(stream->send_sem);
-		pthread_join(stream->send_thread, &ret);
 		obs_output_end_data_capture(stream->output);
-		RTMP_Close(&stream->rtmp);
 	}
-
-	os_event_reset(stream->stop_event);
-
-	stream->sent_headers = false;
 }
 
 static inline void set_rtmp_str(AVal *val, const char *str)
@@ -193,12 +241,62 @@ static inline bool get_next_packet(struct rtmp_stream *stream,
 	return new_packet;
 }
 
+static bool discard_recv_data(struct rtmp_stream *stream, size_t size)
+{
+	RTMP *rtmp = &stream->rtmp;
+	uint8_t buf[512];
+#ifdef _WIN32
+	int ret;
+#else
+	ssize_t ret;
+#endif
+
+	do {
+		size_t bytes = size > 512 ? 512 : size;
+		size -= bytes;
+
+#ifdef _WIN32
+		ret = recv(rtmp->m_sb.sb_socket, buf, (int)bytes, 0);
+#else
+		ret = recv(rtmp->m_sb.sb_socket, buf, bytes, 0);
+#endif
+
+		if (ret <= 0) {
+#ifdef _WIN32
+			int error = WSAGetLastError();
+#else
+			int error = errno;
+#endif
+			if (ret < 0) {
+				do_log(LOG_ERROR, "recv error: %d (%d bytes)",
+						error, (int)size);
+			}
+			return false;
+		}
+	} while (size > 0);
+
+	return true;
+}
+
 static int send_packet(struct rtmp_stream *stream,
 		struct encoder_packet *packet, bool is_header, size_t idx)
 {
 	uint8_t *data;
 	size_t  size;
+	int     recv_size = 0;
 	int     ret = 0;
+
+#ifdef _WIN32
+	ret = ioctlsocket(stream->rtmp.m_sb.sb_socket, FIONREAD,
+			(u_long*)&recv_size);
+#else
+	ret = ioctl(stream->rtmp.m_sb.sb_socket, FIONREAD, &recv_size);
+#endif
+
+	if (ret >= 0 && recv_size > 0) {
+		if (!discard_recv_data(stream, (size_t)recv_size))
+			return -1;
+	}
 
 	flv_packet_mux(packet, &data, &size, is_header);
 #ifdef TEST_FRAMEDROPS
@@ -218,13 +316,24 @@ static inline void send_headers(struct rtmp_stream *stream);
 static bool send_remaining_packets(struct rtmp_stream *stream)
 {
 	struct encoder_packet packet;
+	uint64_t max_ns = (uint64_t)stream->max_shutdown_time_sec * 1000000000;
+	uint64_t begin_time_ns = os_gettime_ns();
 
 	if (!stream->sent_headers)
 		send_headers(stream);
 
-	while (get_next_packet(stream, &packet))
+	while (get_next_packet(stream, &packet)) {
 		if (send_packet(stream, &packet, false, packet.track_idx) < 0)
 			return false;
+
+		/* Just disconnect if it takes too long to shut down */
+		if ((os_gettime_ns() - begin_time_ns) > max_ns) {
+			info("Took longer than %d second(s) to shut down, "
+			     "automatically stopping connection",
+			     stream->max_shutdown_time_sec);
+			return false;
+		}
+	}
 
 	return true;
 }
@@ -232,12 +341,13 @@ static bool send_remaining_packets(struct rtmp_stream *stream)
 static void *send_thread(void *data)
 {
 	struct rtmp_stream *stream = data;
-	bool disconnected = false;
+
+	os_set_thread_name("rtmp-stream: send_thread");
 
 	while (os_sem_wait(stream->send_sem) == 0) {
 		struct encoder_packet packet;
 
-		if (os_event_try(stream->stop_event) != EAGAIN)
+		if (stopping(stream))
 			break;
 		if (!get_next_packet(stream, &packet))
 			continue;
@@ -246,27 +356,30 @@ static void *send_thread(void *data)
 			send_headers(stream);
 
 		if (send_packet(stream, &packet, false, packet.track_idx) < 0) {
-			disconnected = true;
+			os_atomic_set_bool(&stream->disconnected, true);
 			break;
 		}
 	}
 
-	if (!disconnected && !send_remaining_packets(stream))
-		disconnected = true;
+	if (!disconnected(stream) && !send_remaining_packets(stream))
+		os_atomic_set_bool(&stream->disconnected, true);
 
-	if (disconnected) {
+	if (disconnected(stream)) {
 		info("Disconnected from %s", stream->path.array);
 		free_packets(stream);
 	} else {
 		info("User stopped the stream");
 	}
 
-	if (os_event_try(stream->stop_event) == EAGAIN) {
+	RTMP_Close(&stream->rtmp);
+
+	if (!stopping(stream)) {
 		pthread_detach(stream->send_thread);
 		obs_output_signal_stop(stream->output, OBS_OUTPUT_DISCONNECTED);
 	}
 
-	stream->active = false;
+	os_event_reset(stream->stop_event);
+	os_atomic_set_bool(&stream->active, false);
 	stream->sent_headers = false;
 	return NULL;
 }
@@ -381,12 +494,69 @@ static int init_send(struct rtmp_stream *stream)
 		return OBS_OUTPUT_ERROR;
 	}
 
-	stream->active = true;
+	os_atomic_set_bool(&stream->active, true);
 	while (send_meta_data(stream, idx++));
 	obs_output_begin_data_capture(stream->output, 0);
 
 	return OBS_OUTPUT_SUCCESS;
 }
+
+#ifdef _WIN32
+static void win32_log_interface_type(struct rtmp_stream *stream)
+{
+	RTMP *rtmp = &stream->rtmp;
+	MIB_IPFORWARDROW route;
+	uint32_t dest_addr, source_addr;
+	char hostname[256];
+	HOSTENT *h;
+
+	if (rtmp->Link.hostname.av_len >= sizeof(hostname) - 1)
+		return;
+
+	strncpy(hostname, rtmp->Link.hostname.av_val, sizeof(hostname));
+	hostname[rtmp->Link.hostname.av_len] = 0;
+
+	h = gethostbyname(hostname);
+	if (!h)
+		return;
+
+	dest_addr = *(uint32_t*)h->h_addr_list[0];
+
+	if (rtmp->m_bindIP.addrLen == 0)
+		source_addr = 0;
+	else if (rtmp->m_bindIP.addr.ss_family = AF_INET)
+		source_addr = (*(struct sockaddr_in*)&rtmp->m_bindIP)
+			.sin_addr.S_un.S_addr;
+	else
+		return;
+
+	if (!GetBestRoute(dest_addr, source_addr, &route)) {
+		MIB_IFROW row;
+		memset(&row, 0, sizeof(row));
+		row.dwIndex = route.dwForwardIfIndex;
+
+		if (!GetIfEntry(&row)) {
+			uint32_t speed =row.dwSpeed / 1000000;
+			char *type;
+			struct dstr other = {0};
+
+			if (row.dwType == IF_TYPE_ETHERNET_CSMACD) {
+				type = "ethernet";
+			} else if (row.dwType == IF_TYPE_IEEE80211) {
+				type = "802.11";
+			} else {
+				dstr_printf(&other, "type %lu", row.dwType);
+				type = other.array;
+			}
+
+			info("Interface: %s (%s, %lu mbps)", row.bDescr, type,
+					speed);
+
+			dstr_free(&other);
+		}
+	}
+}
+#endif
 
 static int try_connect(struct rtmp_stream *stream)
 {
@@ -439,6 +609,10 @@ static int try_connect(struct rtmp_stream *stream)
 	stream->rtmp.m_bSendChunkSizeInfo = true;
 	stream->rtmp.m_bUseNagle          = true;
 
+#ifdef _WIN32
+	win32_log_interface_type(stream);
+#endif
+
 	if (!RTMP_Connect(&stream->rtmp, NULL))
 		return OBS_OUTPUT_CONNECT_FAILED;
 	if (!RTMP_ConnectStream(&stream->rtmp, 0))
@@ -449,34 +623,21 @@ static int try_connect(struct rtmp_stream *stream)
 	return init_send(stream);
 }
 
-static void *connect_thread(void *data)
+static bool init_connect(struct rtmp_stream *stream)
 {
-	struct rtmp_stream *stream = data;
-	int ret = try_connect(stream);
-
-	if (ret != OBS_OUTPUT_SUCCESS) {
-		obs_output_signal_stop(stream->output, ret);
-		info("Connection to %s failed: %d", stream->path.array, ret);
-	}
-
-	if (os_event_try(stream->stop_event) == EAGAIN)
-		pthread_detach(stream->connect_thread);
-
-	stream->connecting = false;
-	return NULL;
-}
-
-static bool rtmp_stream_start(void *data)
-{
-	struct rtmp_stream *stream = data;
-	obs_service_t *service = obs_output_get_service(stream->output);
+	obs_service_t *service;
 	obs_data_t *settings;
 
-	if (!obs_output_can_begin_data_capture(stream->output, 0))
-		return false;
-	if (!obs_output_initialize_encoders(stream->output, 0))
+	if (stopping(stream))
+		pthread_join(stream->send_thread, NULL);
+
+	free_packets(stream);
+
+	service = obs_output_get_service(stream->output);
+	if (!service)
 		return false;
 
+	os_atomic_set_bool(&stream->disconnected, false);
 	stream->total_bytes_sent = 0;
 	stream->dropped_frames   = 0;
 	stream->min_drop_dts_usec= 0;
@@ -489,8 +650,48 @@ static bool rtmp_stream_start(void *data)
 	dstr_copy(&stream->password, obs_service_get_password(service));
 	stream->drop_threshold_usec =
 		(int64_t)obs_data_get_int(settings, OPT_DROP_THRESHOLD) * 1000;
+	stream->max_shutdown_time_sec =
+		(int)obs_data_get_int(settings, OPT_MAX_SHUTDOWN_TIME_SEC);
 	obs_data_release(settings);
+	return true;
+}
 
+static void *connect_thread(void *data)
+{
+	struct rtmp_stream *stream = data;
+	int ret;
+
+	os_set_thread_name("rtmp-stream: connect_thread");
+
+	if (!init_connect(stream)) {
+		obs_output_signal_stop(stream->output, OBS_OUTPUT_BAD_PATH);
+		return NULL;
+	}
+
+	ret = try_connect(stream);
+
+	if (ret != OBS_OUTPUT_SUCCESS) {
+		obs_output_signal_stop(stream->output, ret);
+		info("Connection to %s failed: %d", stream->path.array, ret);
+	}
+
+	if (!stopping(stream))
+		pthread_detach(stream->connect_thread);
+
+	os_atomic_set_bool(&stream->connecting, false);
+	return NULL;
+}
+
+static bool rtmp_stream_start(void *data)
+{
+	struct rtmp_stream *stream = data;
+
+	if (!obs_output_can_begin_data_capture(stream->output, 0))
+		return false;
+	if (!obs_output_initialize_encoders(stream->output, 0))
+		return false;
+
+	os_atomic_set_bool(&stream->connecting, true);
 	return pthread_create(&stream->connect_thread, NULL, connect_thread,
 			stream) == 0;
 }
@@ -595,7 +796,10 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 {
 	struct rtmp_stream    *stream = data;
 	struct encoder_packet new_packet;
-	bool                  added_packet;
+	bool                  added_packet = false;
+
+	if (disconnected(stream))
+		return;
 
 	if (packet->type == OBS_ENCODER_VIDEO)
 		obs_parse_avc_packet(&new_packet, packet);
@@ -604,9 +808,11 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 
 	pthread_mutex_lock(&stream->packets_mutex);
 
-	added_packet = (packet->type == OBS_ENCODER_VIDEO) ?
-		add_video_packet(stream, &new_packet) :
-		add_packet(stream, &new_packet);
+	if (!disconnected(stream)) {
+		added_packet = (packet->type == OBS_ENCODER_VIDEO) ?
+			add_video_packet(stream, &new_packet) :
+			add_packet(stream, &new_packet);
+	}
 
 	pthread_mutex_unlock(&stream->packets_mutex);
 
@@ -619,6 +825,7 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 static void rtmp_stream_defaults(obs_data_t *defaults)
 {
 	obs_data_set_default_int(defaults, OPT_DROP_THRESHOLD, 600);
+	obs_data_set_default_int(defaults, OPT_MAX_SHUTDOWN_TIME_SEC, 5);
 }
 
 static obs_properties_t *rtmp_stream_properties(void *unused)
@@ -630,6 +837,7 @@ static obs_properties_t *rtmp_stream_properties(void *unused)
 	obs_properties_add_int(props, OPT_DROP_THRESHOLD,
 			obs_module_text("RTMPStream.DropThreshold"),
 			200, 10000, 100);
+
 	return props;
 }
 
