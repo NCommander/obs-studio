@@ -42,10 +42,22 @@
 #define debug(format, ...) do_log(LOG_DEBUG,   format, ##__VA_ARGS__)
 
 #define OPT_DROP_THRESHOLD "drop_threshold_ms"
+#define OPT_PFRAME_DROP_THRESHOLD "pframe_drop_threshold_ms"
 #define OPT_MAX_SHUTDOWN_TIME_SEC "max_shutdown_time_sec"
 #define OPT_BIND_IP "bind_ip"
 
 //#define TEST_FRAMEDROPS
+
+#ifdef TEST_FRAMEDROPS
+
+#define DROPTEST_MAX_KBPS 3000
+#define DROPTEST_MAX_BYTES (DROPTEST_MAX_KBPS * 1000 / 8)
+
+struct droptest_info {
+	uint64_t ts;
+	size_t size;
+};
+#endif
 
 struct rtmp_stream {
 	obs_output_t     *output;
@@ -66,6 +78,7 @@ struct rtmp_stream {
 	os_sem_t         *send_sem;
 	os_event_t       *stop_event;
 	uint64_t         stop_ts;
+	uint64_t         shutdown_timeout_ts;
 
 	struct dstr      path, key;
 	struct dstr      username, password;
@@ -75,12 +88,19 @@ struct rtmp_stream {
 	/* frame drop variables */
 	int64_t          drop_threshold_usec;
 	int64_t          min_drop_dts_usec;
+	int64_t          pframe_drop_threshold_usec;
+	int64_t          pframe_min_drop_dts_usec;
 	int              min_priority;
 
 	int64_t          last_dts_usec;
 
 	uint64_t         total_bytes_sent;
 	int              dropped_frames;
+
+#ifdef TEST_FRAMEDROPS
+	struct circlebuf droptest_info;
+	size_t           droptest_size;
+#endif
 
 	RTMP             rtmp;
 };
@@ -172,6 +192,9 @@ static void rtmp_stream_destroy(void *data)
 		os_sem_destroy(stream->send_sem);
 		pthread_mutex_destroy(&stream->packets_mutex);
 		circlebuf_free(&stream->packets);
+#ifdef TEST_FRAMEDROPS
+		circlebuf_free(&stream->droptest_info);
+#endif
 		bfree(stream);
 	}
 }
@@ -203,7 +226,7 @@ static void rtmp_stream_stop(void *data, uint64_t ts)
 {
 	struct rtmp_stream *stream = data;
 
-	if (stopping(stream))
+	if (stopping(stream) && ts != 0)
 		return;
 
 	if (connecting(stream))
@@ -211,6 +234,10 @@ static void rtmp_stream_stop(void *data, uint64_t ts)
 
 	stream->stop_ts = ts / 1000ULL;
 	os_event_signal(stream->stop_event);
+
+	if (ts)
+		stream->shutdown_timeout_ts = ts +
+			(uint64_t)stream->max_shutdown_time_sec * 1000000000ULL;
 
 	if (active(stream)) {
 		if (stream->stop_ts == 0)
@@ -285,6 +312,40 @@ static bool discard_recv_data(struct rtmp_stream *stream, size_t size)
 	return true;
 }
 
+#ifdef TEST_FRAMEDROPS
+static void droptest_cap_data_rate(struct rtmp_stream *stream, size_t size)
+{
+	uint64_t ts = os_gettime_ns();
+	struct droptest_info info;
+
+	info.ts = ts;
+	info.size = size;
+
+	circlebuf_push_back(&stream->droptest_info, &info, sizeof(info));
+	stream->droptest_size += size;
+
+	if (stream->droptest_info.size) {
+		circlebuf_peek_front(&stream->droptest_info,
+				&info, sizeof(info));
+
+		if (stream->droptest_size > DROPTEST_MAX_BYTES) {
+			uint64_t elapsed = ts - info.ts;
+
+			if (elapsed < 1000000000ULL) {
+				elapsed = 1000000000ULL - elapsed;
+				os_sleepto_ns(ts + elapsed);
+			}
+
+			while (stream->droptest_size > DROPTEST_MAX_BYTES) {
+				circlebuf_pop_front(&stream->droptest_info,
+						&info, sizeof(info));
+				stream->droptest_size -= info.size;
+			}
+		}
+	}
+}
+#endif
+
 static int send_packet(struct rtmp_stream *stream,
 		struct encoder_packet *packet, bool is_header, size_t idx)
 {
@@ -306,9 +367,11 @@ static int send_packet(struct rtmp_stream *stream,
 	}
 
 	flv_packet_mux(packet, &data, &size, is_header);
+
 #ifdef TEST_FRAMEDROPS
-	os_sleep_ms(rand() % 40);
+	droptest_cap_data_rate(stream, size);
 #endif
+
 	ret = RTMP_Write(&stream->rtmp, (char*)data, (int)size, (int)idx);
 	bfree(data);
 
@@ -319,6 +382,19 @@ static int send_packet(struct rtmp_stream *stream,
 }
 
 static inline bool send_headers(struct rtmp_stream *stream);
+
+static inline bool can_shutdown_stream(struct rtmp_stream *stream,
+		struct encoder_packet *packet)
+{
+	uint64_t cur_time = os_gettime_ns();
+	bool timeout = cur_time >= stream->shutdown_timeout_ts;
+
+	if (timeout)
+		info("Stream shutdown timeout reached (%d second(s))",
+				stream->max_shutdown_time_sec);
+
+	return timeout || packet->sys_dts_usec >= (int64_t)stream->stop_ts;
+}
 
 static void *send_thread(void *data)
 {
@@ -337,7 +413,7 @@ static void *send_thread(void *data)
 			continue;
 
 		if (stopping(stream)) {
-			if (packet.sys_dts_usec >= (int64_t)stream->stop_ts) {
+			if (can_shutdown_stream(stream, &packet)) {
 				obs_free_encoder_packet(&packet);
 				break;
 			}
@@ -586,18 +662,7 @@ static int try_connect(struct rtmp_stream *stream)
 
 	RTMP_EnableWrite(&stream->rtmp);
 
-	dstr_copy(&stream->encoder_name, "FMLE/3.0 (compatible; obs-studio/");
-
-#ifdef HAVE_OBSCONFIG_H
-	dstr_cat(&stream->encoder_name, OBS_VERSION);
-#else
-	dstr_catf(&stream->encoder_name, "%d.%d.%d",
-			LIBOBS_API_MAJOR_VER,
-			LIBOBS_API_MINOR_VER,
-			LIBOBS_API_PATCH_VER);
-#endif
-
-	dstr_cat(&stream->encoder_name, "; FMSc/1.0)");
+	dstr_copy(&stream->encoder_name, "FMLE/3.0 (compatible; FMSc/1.0)");
 
 	set_rtmp_dstr(&stream->rtmp.Link.pubUser,   &stream->username);
 	set_rtmp_dstr(&stream->rtmp.Link.pubPasswd, &stream->password);
@@ -652,6 +717,8 @@ static bool init_connect(struct rtmp_stream *stream)
 	obs_service_t *service;
 	obs_data_t *settings;
 	const char *bind_ip;
+	int64_t drop_p;
+	int64_t drop_b;
 
 	if (stopping(stream))
 		pthread_join(stream->send_thread, NULL);
@@ -675,10 +742,16 @@ static bool init_connect(struct rtmp_stream *stream)
 	dstr_copy(&stream->password, obs_service_get_password(service));
 	dstr_depad(&stream->path);
 	dstr_depad(&stream->key);
-	stream->drop_threshold_usec =
-		(int64_t)obs_data_get_int(settings, OPT_DROP_THRESHOLD) * 1000;
+	drop_b = (int64_t)obs_data_get_int(settings, OPT_DROP_THRESHOLD);
+	drop_p = (int64_t)obs_data_get_int(settings, OPT_PFRAME_DROP_THRESHOLD);
 	stream->max_shutdown_time_sec =
 		(int)obs_data_get_int(settings, OPT_MAX_SHUTDOWN_TIME_SEC);
+
+	if (drop_p < (drop_b + 200))
+		drop_p = drop_b + 200;
+
+	stream->drop_threshold_usec = 1000 * drop_b;
+	stream->pframe_drop_threshold_usec = 1000 * drop_p;
 
 	bind_ip = obs_data_get_string(settings, OPT_BIND_IP);
 	dstr_copy(&stream->bind_ip, bind_ip);
@@ -741,14 +814,18 @@ static inline size_t num_buffered_packets(struct rtmp_stream *stream)
 	return stream->packets.size / sizeof(struct encoder_packet);
 }
 
-static void drop_frames(struct rtmp_stream *stream)
+static void drop_frames(struct rtmp_stream *stream, const char *name,
+		int highest_priority, int64_t *p_min_dts_usec)
 {
 	struct circlebuf new_buf            = {0};
-	int              drop_priority      = 0;
 	uint64_t         last_drop_dts_usec = 0;
 	int              num_frames_dropped = 0;
 
-	debug("Previous packet count: %d", (int)num_buffered_packets(stream));
+#ifdef _DEBUG
+	int start_packets = (int)num_buffered_packets(stream);
+#else
+	UNUSED_PARAMETER(name);
+#endif
 
 	circlebuf_reserve(&new_buf, sizeof(struct encoder_packet) * 8);
 
@@ -760,56 +837,71 @@ static void drop_frames(struct rtmp_stream *stream)
 
 		/* do not drop audio data or video keyframes */
 		if (packet.type          == OBS_ENCODER_AUDIO ||
-		    packet.drop_priority == OBS_NAL_PRIORITY_HIGHEST) {
+		    packet.drop_priority >= highest_priority) {
 			circlebuf_push_back(&new_buf, &packet, sizeof(packet));
 
 		} else {
-			if (drop_priority < packet.drop_priority)
-				drop_priority = packet.drop_priority;
-
 			num_frames_dropped++;
 			obs_free_encoder_packet(&packet);
 		}
 	}
 
 	circlebuf_free(&stream->packets);
-	stream->packets           = new_buf;
-	stream->min_priority      = drop_priority;
-	stream->min_drop_dts_usec = last_drop_dts_usec;
+	stream->packets = new_buf;
+
+	if (stream->min_priority < highest_priority)
+		stream->min_priority = highest_priority;
+
+	*p_min_dts_usec = last_drop_dts_usec;
 
 	stream->dropped_frames += num_frames_dropped;
-	debug("New packet count: %d", (int)num_buffered_packets(stream));
+#ifdef _DEBUG
+	debug("Dropped %s, prev packet count: %d, new packet count: %d",
+			name,
+			start_packets,
+			(int)num_buffered_packets(stream));
+#endif
 }
 
-static void check_to_drop_frames(struct rtmp_stream *stream)
+static void check_to_drop_frames(struct rtmp_stream *stream, bool pframes)
 {
 	struct encoder_packet first;
 	int64_t buffer_duration_usec;
+	size_t num_packets = num_buffered_packets(stream);
+	const char *name = pframes ? "p-frames" : "b-frames";
+	int priority = pframes ?
+		OBS_NAL_PRIORITY_HIGHEST : OBS_NAL_PRIORITY_HIGH;
+	int64_t *p_min_dts_usec = pframes ?
+		&stream->pframe_min_drop_dts_usec :
+		&stream->min_drop_dts_usec;
+	int64_t drop_threshold = pframes ?
+		stream->pframe_drop_threshold_usec :
+		stream->drop_threshold_usec;
 
-	if (num_buffered_packets(stream) < 5)
+	if (num_packets < 5)
 		return;
 
 	circlebuf_peek_front(&stream->packets, &first, sizeof(first));
 
 	/* do not drop frames if frames were just dropped within this time */
-	if (first.dts_usec < stream->min_drop_dts_usec)
+	if (first.dts_usec < *p_min_dts_usec)
 		return;
 
 	/* if the amount of time stored in the buffered packets waiting to be
 	 * sent is higher than threshold, drop frames */
 	buffer_duration_usec = stream->last_dts_usec - first.dts_usec;
 
-	if (buffer_duration_usec > stream->drop_threshold_usec) {
-		drop_frames(stream);
-		debug("dropping %" PRId64 " worth of frames",
-				buffer_duration_usec);
+	if (buffer_duration_usec > drop_threshold) {
+		debug("buffer_duration_usec: %lld", buffer_duration_usec);
+		drop_frames(stream, name, priority, p_min_dts_usec);
 	}
 }
 
 static bool add_video_packet(struct rtmp_stream *stream,
 		struct encoder_packet *packet)
 {
-	check_to_drop_frames(stream);
+	check_to_drop_frames(stream, false);
+	check_to_drop_frames(stream, true);
 
 	/* if currently dropping frames, drop packets until it reaches the
 	 * desired priority */
@@ -855,8 +947,9 @@ static void rtmp_stream_data(void *data, struct encoder_packet *packet)
 
 static void rtmp_stream_defaults(obs_data_t *defaults)
 {
-	obs_data_set_default_int(defaults, OPT_DROP_THRESHOLD, 600);
-	obs_data_set_default_int(defaults, OPT_MAX_SHUTDOWN_TIME_SEC, 5);
+	obs_data_set_default_int(defaults, OPT_DROP_THRESHOLD, 500);
+	obs_data_set_default_int(defaults, OPT_PFRAME_DROP_THRESHOLD, 800);
+	obs_data_set_default_int(defaults, OPT_MAX_SHUTDOWN_TIME_SEC, 30);
 	obs_data_set_default_string(defaults, OPT_BIND_IP, "default");
 }
 

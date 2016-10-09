@@ -112,7 +112,6 @@
             ],
             "recommended": {
                 "keyint": 2,
-                "profile": "main",
                 "max video bitrate": 3500,
                 "max audio bitrate": 160,
                 "x264opts": "scenecut=0"
@@ -183,8 +182,12 @@
                     "url": "rtmp://live.vgn.hitbox.tv/push"
                 },
                 {
-                    "name": "US-East: New York",
+                    "name": "US-East: New York - 1",
                     "url": "rtmp://live.jfk.hitbox.tv/push"
+                },
+                {
+                    "name": "US-East: New York - 2",
+                    "url": "rtmp://live.nyc.hitbox.tv/push"
                 },
                 {
                     "name": "US-Central: Denver",
@@ -259,16 +262,40 @@
                     "url": "rtmp://ingest-ams.beam.pro:1935/beam"
                 },
                 {
+                    "name": "EU: Milan",
+                    "url": "rtmp://ingest-mil.beam.pro:1935/beam"
+                },
+                {
+                    "name": "EU: Paris",
+                    "url": "rtmp://ingest-par.beam.pro:1935/beam"
+                },
+                {
                     "name": "EU: Frankfurt",
                     "url": "rtmp://ingest-fra.beam.pro:1935/beam"
+                },
+                {
+                    "name": "Brazil: Sao Paulo",
+                    "url": "rtmp://ingest-sao.beam.pro:1935/beam"
                 },
                 {
                     "name": "Australia: Melbourne",
                     "url": "rtmp://ingest-mel.beam.pro:1935/beam"
                 },
                 {
-                    "name": "Brazil: Sao Paulo",
-                    "url": "rtmp://ingest-sao.beam.pro:1935/beam"
+                    "name": "Australia: Sydney",
+                    "url": "rtmp://ingest-syd.beam.pro:1935/beam"
+                },
+                {
+                    "name": "Mexico: Mexico City",
+                    "url": "rtmp://ingest-mex.beam.pro:1935/beam"
+                },
+                {
+                    "name": "Asia: Hong Kong",
+                    "url": "rtmp://ingest-hkg.beam.pro:1935/beam"
+                },
+                {
+                    "name": "Asia: Tokyo",
+                    "url": "rtmp://ingest-tok.beam.pro:1935/beam"
                 }
             ],
             "recommended": {
@@ -517,8 +544,8 @@
             "recommended": {
                 "keyint": 2,
                 "profile": "main",
-                "max video bitrate": 2500,
-                "max audio bitrate": 160
+                "max video bitrate": 4000,
+                "max audio bitrate": 128
             }
         },
         {
@@ -551,6 +578,10 @@
                 },
                 {
                     "name": "EU-Central (Frankfurt, Germany)",
+                    "url": "rtmp://eu-central.restream.io/live"
+                },
+                {
+                    "name": "EU-Central 2 (Frankfurt, Germany)",
                     "url": "rtmp://eu.restream.io/live"
                 },
                 {
@@ -566,8 +597,16 @@
                     "url": "rtmp://au.restream.io/live"
                 },
                 {
+                    "name": "Australia Secondary (Sydney)",
+                    "url": "rtmp://au-secondary.restream.io/live"
+                },
+                {
                     "name": "South America (Sao Paulo, Brazil)",
                     "url": "rtmp://sa.restream.io/live"
+                },
+                {
+                    "name": "Asia (Singapore)",
+                    "url": "rtmp://singapore.restream.io/live"
                 }
             ],
             "recommended": {
@@ -656,6 +695,113 @@
             ],
             "recommended": {
                 "max video bitrate": 1500
+            }
+        },
+        {
+            "name": "Meridix Live Sports Platform",
+            "servers": [
+                {
+                    "name": "Primary",
+                    "url": "rtmp://publish.meridix.com/live"
+                }
+            ],
+            "recommended": {
+                "max video bitrate": 3500
+            }
+        },
+        {
+            "name": "Afreeca.TV",
+            "servers": [
+                {
+                    "name": "North America : US East",
+                    "url": "rtmp://rtmpmanager-aws-en-east.afreeca.tv/live"
+                },
+                {
+                    "name": "North America : US West",
+                     "url": "rtmp://rtmpmanager-aws-en-west.afreeca.tv/live"
+                },
+                {
+                    "name": "Asia : Singapore",
+                    "url": "rtmp://rtmpmanager-aws-sg.afreeca.tv/live"
+                },
+                {
+                    "name": "Asia : South Korea",
+                    "url": "rtmp://rtmpmanager-en-ko.afreeca.tv/live"
+                }
+            ],
+            "recommended": {
+                "keyint": 1,
+                "profile": "main",
+                "max video bitrate": 5000,
+                "max audio bitrate": 192
+            }
+        },
+        {
+            "name": "アフリカTV",
+            "servers": [
+                {
+                "name": "Japan",
+                "url": "rtmp://rtmpmanager-aws-jp.afreeca.tv/live/"
+                },
+                {
+                "name": "South Korea",
+                "url": "rtmp://rtmpmanager-jp.afreeca.tv/live/"
+                }
+            ],
+            "recommended": {
+                "keyint": 1,
+                "profile": "main",
+                "max video bitrate": 5000,
+                "max audio bitrate": 192
+            }
+        },
+        {
+            "name": "艾菲卡TV",
+            "servers": [
+                {
+                "name": "Taiwan",
+                "url": "rtmp://rtmpmanager-gcp-tw.afreeca.tv/live/"
+                },
+                {
+                    "name": "South Korea",
+                    "url": "rtmp://rtmpmanager-tw-ko.afreeca.tv/live/"
+                }
+            ],
+             "recommended": {
+                "keyint": 1,
+                "profile": "main",
+                "max video bitrate": 5000,
+                "max audio bitrate": 192
+            }
+        },
+        {
+            "name": "아프리카TV",
+            "servers": [
+                {
+                "name": "Korea",
+                "url": "rtmp://rtmpmanager-freecat.afreeca.tv/app/"
+                }
+            ],
+            "recommended": {
+                "keyint": 1,
+                "profile": "main",
+                "max video bitrate": 5000,
+                "max audio bitrate": 192
+            }
+        },
+        {
+            "name": "CAM4",
+            "servers": [
+                {
+                    "name": "CAM4",
+                    "url": "rtmp://origin.cam4.com/cam4-origin-live"
+                }
+            ],
+            "recommended": {
+                "keyint": 1,
+                "profile": "baseline",
+                "max video bitrate": 3000,
+                "max audio bitrate": 128
             }
         }
     ]

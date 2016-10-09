@@ -10,6 +10,7 @@ OBS_MODULE_USE_DEFAULT_LOCALE("obs-outputs", "en-US")
 
 extern struct obs_output_info rtmp_output_info;
 extern struct obs_output_info flv_output_info;
+extern struct obs_output_info ftl_output_info;
 
 bool obs_module_load(void)
 {
@@ -20,6 +21,8 @@ bool obs_module_load(void)
 
 	obs_register_output(&rtmp_output_info);
 	obs_register_output(&flv_output_info);
+	obs_register_output(&ftl_output_info);
+	
 	return true;
 }
 

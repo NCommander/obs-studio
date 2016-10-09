@@ -695,16 +695,29 @@ add_addr_info(struct sockaddr_storage *service, socklen_t *addrlen, AVal *host, 
         goto finish;
     }
 
-    // they should come back in OS preferred order
+    // prefer ipv4 results, since lots of ISPs have broken ipv6 connectivity
     for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
     {
-        if (ptr->ai_family == AF_INET || ptr->ai_family == AF_INET6)
+        if (ptr->ai_family == AF_INET)
         {
             memcpy(service, ptr->ai_addr, ptr->ai_addrlen);
             *addrlen = (socklen_t)ptr->ai_addrlen;
             break;
         }
     }
+
+	if (!*addrlen)
+	{
+		for (ptr = result; ptr != NULL; ptr = ptr->ai_next)
+		{
+			if (ptr->ai_family == AF_INET6)
+			{
+				memcpy(service, ptr->ai_addr, ptr->ai_addrlen);
+				*addrlen = (socklen_t)ptr->ai_addrlen;
+				break;
+			}
+		}
+	}
 
     freeaddrinfo(result);
 
@@ -3091,7 +3104,10 @@ HandleInvoke(RTMP *r, const char *body, unsigned int nBodySize)
     {
         RTMP_Log(RTMP_LOGERROR, "rtmp server requested close");
         RTMP_Close(r);
-#if defined(CRYPTO) || defined(USE_ONLY_MD5)
+
+        // disabled this for now, if the server sends an rtmp close message librtmp
+        // will enter an infinite loop here until stack is exhausted.
+#if 0 && (defined(CRYPTO) || defined(USE_ONLY_MD5))
         if ((r->Link.protocol & RTMP_FEATURE_WRITE) &&
                 !(r->Link.pFlags & RTMP_PUB_CLEAN) &&
                 (  !(r->Link.pFlags & RTMP_PUB_NAME) ||

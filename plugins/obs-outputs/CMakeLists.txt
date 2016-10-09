@@ -19,7 +19,6 @@ else()
 	add_definitions(-DNO_CRYPTO)
 endif()
 
-
 if(WIN32)
 	set(obs-outputs_PLATFORM_DEPS
 		ws2_32
@@ -57,6 +56,8 @@ set(obs-outputs_librtmp_SOURCES
 if(NOT WIN32)
 	set_source_files_properties(${obs-outputs_librtmp_SOURCES} PROPERTIES
 		COMPILE_FLAGS "-fvisibility=hidden")
+	set_source_files_properties(${obs-outputs_libftl_SOURCES} PROPERTIES
+		COMPILE_FLAGS "-fvisibility=hidden")		
 endif()
 
 set(obs-outputs_HEADERS
@@ -69,6 +70,7 @@ set(obs-outputs_HEADERS
 set(obs-outputs_SOURCES
 	obs-outputs.c
 	rtmp-stream.c
+	ftl-stream.c
 	flv-output.c
 	flv-mux.c
 	net-if.c)
@@ -82,6 +84,7 @@ target_link_libraries(obs-outputs
 	libobs
 	${SSL_LIBRARIES}
 	${ZLIB_LIBRARIES}
+	libftl
 	${obs-outputs_PLATFORM_DEPS})
 
 install_obs_plugin_with_data(obs-outputs data)

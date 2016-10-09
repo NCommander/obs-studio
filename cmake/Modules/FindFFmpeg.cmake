@@ -112,6 +112,8 @@ endfunction()
 set(FFMPEG_INCLUDE_DIRS)
 set(FFMPEG_LIBRARIES)
 
+list(APPEND FFmpeg_FIND_COMPONENTS postproc)
+
 if(NOT FFmpeg_FIND_COMPONENTS)
 	message(FATAL_ERROR "No FFmpeg components requested")
 endif()

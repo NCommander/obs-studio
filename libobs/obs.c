@@ -820,6 +820,8 @@ void obs_shutdown(void)
 	obs_free_graphics();
 	proc_handler_destroy(obs->procs);
 	signal_handler_destroy(obs->signals);
+	obs->procs = NULL;
+	obs->signals = NULL;
 
 	module = obs->first_module;
 	while (module) {
@@ -923,14 +925,35 @@ int obs_reset_video(struct obs_video_info *ovi)
 		}
 	}
 
+	const char *scale_type_name = "";
+	switch (ovi->scale_type) {
+	case OBS_SCALE_DISABLE:
+		scale_type_name = "Disabled";
+		break;
+	case OBS_SCALE_POINT:
+		scale_type_name = "Point";
+		break;
+	case OBS_SCALE_BICUBIC:
+		scale_type_name = "Bicubic";
+		break;
+	case OBS_SCALE_BILINEAR:
+		scale_type_name = "Bilinear";
+		break;
+	case OBS_SCALE_LANCZOS:
+		scale_type_name = "Lanczos";
+		break;
+	}
+
 	blog(LOG_INFO, "---------------------------------");
 	blog(LOG_INFO, "video settings reset:\n"
 	               "\tbase resolution:   %dx%d\n"
 	               "\toutput resolution: %dx%d\n"
+	               "\tdownscale filter:  %s\n"
 	               "\tfps:               %d/%d\n"
 	               "\tformat:            %s",
 	               ovi->base_width, ovi->base_height,
 	               ovi->output_width, ovi->output_height,
+	               scale_type_name,
 	               ovi->fps_num, ovi->fps_den,
 		       get_video_format_name(ovi->output_format));
 
@@ -1219,6 +1242,7 @@ void obs_enum_sources(bool (*enum_proc)(void*, obs_source_t*), void *param)
 			(obs_source_t*)source->context.next;
 
 		if ((source->info.type == OBS_SOURCE_TYPE_INPUT) != 0 &&
+		    !source->context.private &&
 		    !enum_proc(param, source))
 			break;
 
@@ -1814,6 +1838,11 @@ profiler_name_store_t *obs_get_profiler_name_store(void)
 uint64_t obs_get_video_frame_time(void)
 {
 	return obs ? obs->video.video_time : 0;
+}
+
+double obs_get_active_fps(void)
+{
+	return obs ? obs->video.video_fps : 0.0;
 }
 
 enum obs_obj_type obs_obj_get_type(void *obj)

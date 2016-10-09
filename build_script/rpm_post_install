@@ -1,0 +1,4 @@
+ln -s /opt/obsftl/bin/obs /usr/bin/obsftl
+bash -c 'echo "/opt/obsftl/lib" > /etc/ld.so.conf.d/obsftl.conf'
+ldconfig
+

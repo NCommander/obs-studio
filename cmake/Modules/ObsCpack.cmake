@@ -5,7 +5,7 @@ elseif(WIN32 AND NOT CPACK_GENERATOR)
 	set(CPACK_GENERATOR "WIX" "ZIP")
 endif()
 
-set(CPACK_PACKAGE_NAME "OBS")
+set(CPACK_PACKAGE_NAME "OBS Studio - FTL")
 set(CPACK_PACKAGE_VENDOR "obsproject.com")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "OBS - Live video and audio streaming and recording software")
 
@@ -31,8 +31,8 @@ MESSAGE(STATUS "OBS_VERSION: ${OBS_VERSION}")
 
 if(INSTALLER_RUN)
 	set(CPACK_PACKAGE_EXECUTABLES
-		"obs32" "OBS Studio (32bit)"
-		"obs64" "OBS Studio (64bit)")
+		"obs32" "OBS Studio (32bit) - FTL"
+		"obs64" "OBS Studio (64bit) - FTL")
 	set(CPACK_CREATE_DESKTOP_LINKS
 		"obs32"
 		"obs64")

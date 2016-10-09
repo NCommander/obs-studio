@@ -81,8 +81,16 @@ void gs_texture_2d::InitTexture(const uint8_t **data)
 
 	hr = device->device->CreateTexture2D(&td, data ? srd.data() : NULL,
 			texture.Assign());
-	if (FAILED(hr))
+
+	if (FAILED(hr)) {
+		if (hr == DXGI_ERROR_DEVICE_REMOVED) {
+			HRESULT reason = device->device->GetDeviceRemovedReason();
+
+			throw HRError("Device removed with reason", reason);
+		}
+
 		throw HRError("Failed to create 2D texture", hr);
+	}
 
 	if (isGDICompatible) {
 		hr = texture->QueryInterface(__uuidof(IDXGISurface1),

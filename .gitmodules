@@ -5,3 +5,15 @@
 [submodule "plugins/mac-syphon/syphon-framework"]
 	path = plugins/mac-syphon/syphon-framework
 	url = https://github.com/palana/Syphon-Framework.git
+
+[submodule "plugins/libftl/ftl-sdk"]
+	path = plugins/libftl/ftl-sdk
+	url = https://github.com/WatchBeam/ftl-sdk.git
+
+[submodule "plugins/enc-amf"]
+	path = plugins/enc-amf
+	url = https://github.com/Xaymar/OBS-AMD-Advanced-Media-Framework.git
+	
+[submodule "plugins/obs-browser"]
+	path = plugins/obs-browser
+	url = https://github.com/kc5nra/obs-browser.git

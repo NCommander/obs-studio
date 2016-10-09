@@ -12,6 +12,7 @@ extern struct obs_source_info  ffmpeg_source;
 extern struct obs_output_info  ffmpeg_output;
 extern struct obs_output_info  ffmpeg_muxer;
 extern struct obs_encoder_info aac_encoder_info;
+extern struct obs_encoder_info opus_encoder_info;
 extern struct obs_encoder_info nvenc_encoder_info;
 
 static DARRAY(struct log_context {
@@ -146,6 +147,7 @@ bool obs_module_load(void)
 	obs_register_output(&ffmpeg_output);
 	obs_register_output(&ffmpeg_muxer);
 	obs_register_encoder(&aac_encoder_info);
+	obs_register_encoder(&opus_encoder_info);
 	if (nvenc_supported()) {
 		blog(LOG_INFO, "NVENC supported");
 		obs_register_encoder(&nvenc_encoder_info);

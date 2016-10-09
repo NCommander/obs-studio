@@ -54,6 +54,7 @@ struct nvenc_encoder {
 
 	int                            height;
 	bool                           first_packet;
+	bool                           initialized;
 };
 
 static const char *nvenc_getname(void *unused)
@@ -113,6 +114,8 @@ static bool nvenc_init_codec(struct nvenc_encoder *enc)
 		return false;
 	}
 
+	enc->initialized = true;
+
 	*((AVPicture*)enc->vframe) = enc->dst_picture;
 	return true;
 }
@@ -138,6 +141,7 @@ static bool nvenc_update(void *data, obs_data_t *settings)
 	bool twopass = obs_data_get_bool(settings, "2pass");
 	int gpu = (int)obs_data_get_int(settings, "gpu");
 	bool cbr_override = obs_data_get_bool(settings, "cbr");
+	int bf = (int)obs_data_get_int(settings, "bf");
 
 	video_t *video = obs_encoder_video(enc->encoder);
 	const struct video_output_info *voi = video_output_get_info(video);
@@ -159,7 +163,7 @@ static bool nvenc_update(void *data, obs_data_t *settings)
 
 	nvenc_video_info(enc, &info);
 	av_opt_set_int(enc->context->priv_data, "cbr", false, 0);
-
+	av_opt_set(enc->context->priv_data, "profile", profile, 0);
 	av_opt_set(enc->context->priv_data, "preset", preset, 0);
 
 	if (astrcmpi(rc, "cqp") == 0) {
@@ -198,6 +202,7 @@ static bool nvenc_update(void *data, obs_data_t *settings)
 		AVCOL_SPC_BT709 : AVCOL_SPC_BT470BG;
 	enc->context->color_range = info.range == VIDEO_RANGE_FULL ?
 		AVCOL_RANGE_JPEG : AVCOL_RANGE_MPEG;
+	enc->context->max_b_frames = bf;
 
 	if (keyint_sec)
 		enc->context->gop_size = keyint_sec * voi->fps_num /
@@ -231,6 +236,20 @@ static bool nvenc_update(void *data, obs_data_t *settings)
 static void nvenc_destroy(void *data)
 {
 	struct nvenc_encoder *enc = data;
+
+	if (enc->initialized) {
+		AVPacket pkt = {0};
+		int r_pkt = 1;
+
+		while (r_pkt) {
+			if (avcodec_encode_video2(enc->context, &pkt, NULL,
+						&r_pkt) < 0)
+				break;
+
+			if (r_pkt)
+				av_free_packet(&pkt);
+		}
+	}
 
 	avcodec_close(enc->context);
 	av_frame_free(&enc->vframe);
@@ -363,6 +382,7 @@ static void nvenc_defaults(obs_data_t *settings)
 	obs_data_set_default_string(settings, "level", "auto");
 	obs_data_set_default_bool(settings, "2pass", true);
 	obs_data_set_default_int(settings, "gpu", 0);
+	obs_data_set_default_int(settings, "bf", 2);
 }
 
 static bool rate_control_modified(obs_properties_t *ppts, obs_property_t *p,
@@ -471,6 +491,9 @@ static obs_properties_t *nvenc_properties(void *unused)
 	obs_properties_add_bool(props, "2pass",
 			obs_module_text("NVENC.Use2Pass"));
 	obs_properties_add_int(props, "gpu", obs_module_text("GPU"), 0, 8, 1);
+
+	obs_properties_add_int(props, "bf", obs_module_text("BFrames"),
+			0, 4, 1);
 
 	return props;
 }

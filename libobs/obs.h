@@ -17,6 +17,8 @@
 
 #pragma once
 
+//#define AUDIO_USE_OPUS
+
 #include "util/c99defs.h"
 #include "util/bmem.h"
 #include "util/profiler.h"
@@ -609,6 +611,8 @@ EXPORT obs_source_t *obs_view_get_source(obs_view_t *view,
 EXPORT void obs_view_render(obs_view_t *view);
 
 EXPORT uint64_t obs_get_video_frame_time(void);
+
+EXPORT double obs_get_active_fps(void);
 
 
 /* ------------------------------------------------------------------------- */

@@ -1,0 +1,3 @@
+#pragma once
+
+#define FTL_SERVICES_URL "@FTL_SERVICES_URL@"

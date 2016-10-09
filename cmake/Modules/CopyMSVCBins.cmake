@@ -172,6 +172,7 @@ set(ALL_BASE_BIN_FILES
 	${FFMPEG_BIN_FILES}
 	${X264_BIN_FILES}
 	${CURL_BIN_FILES}
+	${FTL_BIN_FILES}
 	${SSL_BIN_FILES}
 	${ZLIB_BIN_FILES}
 	${LIBFDK_BIN_FILES}
@@ -207,6 +208,7 @@ message(STATUS "Freetype files: ${FREETYPE_BIN_FILES}")
 message(STATUS "curl files: ${CURL_BIN_FILES}")
 message(STATUS "ssl files: ${SSL_BIN_FILES}")
 message(STATUS "zlib files: ${ZLIB_BIN_FILES}")
+message(STATUS "ftl files: ${FTL_BIN_FILES}")
 message(STATUS "QT Debug files: ${QT_DEBUG_BIN_FILES}")
 message(STATUS "QT Debug Platform files: ${QT_DEBUG_PLAT_BIN_FILES}")
 message(STATUS "QT Release files: ${QT_BIN_FILES}")

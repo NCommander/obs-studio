@@ -1,0 +1,234 @@
+{
+    "format_version": 1,
+    "ingests": [
+        {
+            "name": "US: Dallas, TX",
+            "host": "ingest-dal.beam.pro",
+            "pingTest": "wss://ingest-dal.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "US: San Jose, CA",
+            "host": "ingest-sjc.beam.pro",
+            "pingTest": "wss://ingest-sjc.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "US: Seattle",
+            "host": "ingest-sea.beam.pro",
+            "pingTest": "wss://ingest-sea.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "US: Washington DC",
+            "host": "ingest-wdc.beam.pro",
+            "pingTest": "wss://ingest-wdc.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Canada: Toronto",
+            "host": "ingest-tor.beam.pro",
+            "pingTest": "wss://ingest-tor.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "EU: London",
+            "host": "ingest-lon.beam.pro",
+            "pingTest": "wss://ingest-lon.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "EU: Amsterdam",
+            "host": "ingest-ams.beam.pro",
+            "pingTest": "wss://ingest-ams.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "EU: Milan",
+            "host": "ingest-mil.beam.pro",
+            "pingTest": "wss://ingest-mil.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "EU: Paris",
+            "host": "ingest-par.beam.pro",
+            "pingTest": "wss://ingest-par.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "EU: Frankfurt",
+            "host": "ingest-fra.beam.pro",
+            "pingTest": "wss://ingest-fra.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Brazil: Sao Paulo",
+            "host": "ingest-sao.beam.pro",
+            "pingTest": "wss://ingest-sao.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Australia: Melbourne",
+            "host": "ingest-mel.beam.pro",
+            "pingTest": "wss://ingest-mel.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Australia: Sydney",
+            "host": "ingest-syd.beam.pro",
+            "pingTest": "wss://ingest-syd.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Mexico: Mexico City",
+            "host": "ingest-mex.beam.pro",
+            "pingTest": "wss://ingest-mex.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Asia: Hong Kong",
+            "host": "ingest-hkg.beam.pro",
+            "pingTest": "wss://ingest-hkg.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "Asia: Tokyo",
+            "host": "ingest-tok.beam.pro",
+            "pingTest": "wss://ingest-tok.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        },
+        {
+            "name": "India: Chennai",
+            "host": "ingest-che.beam.pro",
+            "pingTest": "wss://ingest-che.beam.pro:6239",
+            "protocols": [
+                {
+                    "type": "ftl"
+                },
+                {
+                    "type": "rtmp"
+                }
+            ]
+        }
+    ],
+    "recommended": {
+        "keyint": 2,
+        "profile": "baseline",
+        "max video bitrate": 3000,
+        "max audio bitrate": 160,
+        "audio sample rate": 48000,
+        "x264opts": "scenecut=0"
+    }
+}
