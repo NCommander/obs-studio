@@ -392,8 +392,11 @@ static void set_peak_bitrate(struct ftl_stream *stream) {
 		info("Speed test completed: Peak kbps %d, initial rtt %d, final rtt %d, %3.2f lost packets\n",
 			results.peak_kbps, results.starting_rtt, results.ending_rtt, (float)results.lost_pkts * 100.f / (float)results.pkts_sent);
 
-		stream->peak_kbps = stream->params.peak_kbps = results.peak_kbps;
-
+		// Since users want to do crazy things, we don't limit the peak bitrate to what it actually should be.
+		// If the user wants to try to stream at a bitrate that's higher than they should, let them.
+		//stream->peak_kbps = stream->params.peak_kbps = results.peak_kbps;		
+		stream->peak_kbps = stream->params.peak_kbps = speedtest_kbps;
+		
 		ftl_ingest_update_params(&stream->ftl_handle, &stream->params);
 	}
 	else {

@@ -326,8 +326,8 @@ bool AutoConfigStreamPage::validatePage()
 			wiz->service = AutoConfig::Service::Twitch;
 		else if (wiz->serviceName == "hitbox.tv")
 			wiz->service = AutoConfig::Service::Hitbox;
-		else if (wiz->serviceName == "beam.pro")
-			wiz->service = AutoConfig::Service::Beam;
+		else if (wiz->serviceName == "Mixer")
+			wiz->service = AutoConfig::Service::Mixer;
 		else
 			wiz->service = AutoConfig::Service::Other;
 	} else {
@@ -369,7 +369,7 @@ void AutoConfigStreamPage::ServiceChanged()
 	std::string service = QT_TO_UTF8(ui->service->currentText());
 	bool regionBased = service == "Twitch" ||
 	                   service == "hitbox.tv" ||
-	                   service == "beam.pro";
+	                   service == "Mixer";
 	bool testBandwidth = ui->doBandwidthTest->isChecked();
 	bool custom = ui->streamType->currentIndex() == 1;
 
@@ -689,7 +689,7 @@ bool AutoConfig::CanTestServer(const char *server)
 		} else if (regionOther) {
 			return true;
 		}
-	} else if (service == Service::Beam) {
+	} else if (service == Service::Mixer) {
 		if (astrcmp_n(server, "US:", 3) == 0) {
 			return regionUS;
 		} else if (astrcmp_n(server, "EU:", 3) == 0) {

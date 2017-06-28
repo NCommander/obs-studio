@@ -1,6 +1,6 @@
 REM @Echo Off
 SET build_config=Release
-SET obs_version=18.0.1-ftl.0.9.4
+SET obs_version=19.0.3-ftl.0.9.4
 SET coredeps=C:\beam\tachyon_deps
 SET QTDIR64=C:\Qt\5.8\msvc2015_64
 SET QTDIR32=C:\Qt\5.8\msvc2015
@@ -82,7 +82,7 @@ GOTO DONE
 :SUB_FTLSDK
     ECHO Building FTL SDK
 	pushd .
-	call git clone https://github.com/WatchBeam/ftl-sdk.git
+	call git clone https://github.com/Mixer/ftl-sdk.git
 	cd ftl-sdk
 	call git checkout xsplit
 	mkdir build

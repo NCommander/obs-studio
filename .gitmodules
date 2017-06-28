@@ -7,7 +7,7 @@
 
 [submodule "plugins/libftl/ftl-sdk"]
 	path = plugins/libftl/ftl-sdk
-	url = https://github.com/WatchBeam/ftl-sdk.git
+	url = https://github.com/Mixer/ftl-sdk.git
 [submodule "plugins/enc-amf"]
 	path = plugins/enc-amf
 	url = https://github.com/Xaymar/obs-studio_amf-encoder-plugin.git

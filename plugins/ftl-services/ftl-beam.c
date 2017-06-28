@@ -14,7 +14,7 @@ struct ftl_beam {
 static const char *ftl_beam_name(void *unused)
 {
 	UNUSED_PARAMETER(unused);
-	return obs_module_text("Beam FTL Service");
+	return obs_module_text("Mixer FTL Service");
 }
 
 static void ftl_beam_update(void *data, obs_data_t *settings)
@@ -313,7 +313,7 @@ static void fill_servers(obs_property_t *servers_prop, json_t *ingests, const ch
 }
 
 struct obs_service_info ftl_beam_service = {
-	.id             = "ftl_beam",
+	.id             = "ftl_mixer",
 	.get_name       = ftl_beam_name,
 	.create         = ftl_beam_create,
 	.destroy        = ftl_beam_destroy,
