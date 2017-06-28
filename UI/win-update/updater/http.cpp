@@ -36,10 +36,10 @@ public:
 static bool ReadZippedHTTPData(string &responseBuf, z_stream *strm,
 		string &zipBuf, const uint8_t *buffer, DWORD outSize)
 {
-	do {
-		strm->avail_in = outSize;
-		strm->next_in  = buffer;
+	strm->avail_in = outSize;
+	strm->next_in  = buffer;
 
+	do {
 		strm->avail_out = (uInt)zipBuf.size();
 		strm->next_out  = (Bytef *)zipBuf.data();
 
@@ -293,10 +293,10 @@ static bool ReadHTTPZippedFile(z_stream *strm, HANDLE updateFile,
 		string &zipBuf, const uint8_t *buffer, DWORD outSize,
 		int *responseCode)
 {
-	do {
-		strm->avail_in = outSize;
-		strm->next_in  = buffer;
+	strm->avail_in = outSize;
+	strm->next_in  = buffer;
 
+	do {
 		strm->avail_out = (uInt)zipBuf.size();
 		strm->next_out  = (Bytef *)zipBuf.data();
 

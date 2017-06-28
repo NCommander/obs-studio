@@ -62,6 +62,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <obs-module.h>
 #include <string>
 #include <mutex>
+#include <intrin.h>
 
 #define do_log(level, format, ...) \
 	blog(level, "[qsv encoder: '%s'] " format, \
@@ -223,6 +224,6 @@ enum qsv_cpu_platform qsv_get_cpu_platform()
 		return QSV_CPU_PLATFORM_HSW;
 	}
 
-	//assume newer revisions are at least as capable as haswell
+	//assume newer revisions are at least as capable as Haswell
 	return QSV_CPU_PLATFORM_INTEL;
 }
