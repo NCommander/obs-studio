@@ -130,6 +130,7 @@ static void AddExtraModulePaths()
 }
 
 static QList<QKeySequence> DeleteKeys;
+std::string OBSBasic::codecName;
 
 OBSBasic::OBSBasic(QWidget *parent)
 	: OBSMainWindow  (parent),
