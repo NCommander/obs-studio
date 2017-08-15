@@ -1,44 +1,20 @@
-OBS Studio <https://obsproject.com>
-===================================
+### FTL is now officially part of OBS!
 
-What is OBS Studio?
--------------------
+From now on, there’s no need for a custom version of OBS to stream FTL. All future official releases of OBS have the ability to stream FTL out of the box! We recommend all streamers currently using OBS update to the official release of OBS to get the best stability and support.
 
-  OBS Studio is software designed for capturing, compositing, encoding,
-  recording, and streaming video content, efficiently.
+### Download now!
+The official build of OBS can be found on the official OBS website.
 
-  It's distributed under the GNU General Public License v2 - see the
-  accompanying COPYING file for more details.
+https://obsproject.com/
 
-Quick Links
------------
+### Advantages of adding FTL to official OBS:
+-	Record while streaming
+-	Mac and Linux support
+-	Signed OBS installers and game hooks
+-	VCE support (the AMD encoder)
+-	Support for the full OBS feature set
+-	Official OBS updates
+-	Official OBS support
 
- - Website: https://obsproject.com
-
- - Help/Guides: https://github.com/jp9000/obs-studio/wiki
-
- - Forums: https://obsproject.com/forum/
-
- - Build Instructions: https://github.com/jp9000/obs-studio/wiki/Install-Instructions
-
- - Bug Tracker: https://obsproject.com/mantis/
-
-   (Note: The bug tracker is linked to forum accounts.  To use the bug
-   tracker, log in to a forum account)
-
-Contributing
-------------
-
- - If you wish to contribute code to the project, please make sure read
-   the coding and commit guidelines:
-   https://github.com/jp9000/obs-studio/blob/master/CONTRIBUTING.rst
-
- - If you wish to contribute translations, do not submit pull requests.
-   Instead, please use Crowdin.  For more information read this thread:
-   https://obsproject.com/forum/threads/how-to-contribute-translations-for-obs.16327/
-
- - Other ways to contribute are by helping people out with support on
-   our forums or in our community chat.  Please limit support to topics
-   you fully understand -- bad advice is worse than no advice.  When it
-   comes to something that you don't fully know or understand, please
-   defer to the official help or official channels. 
+### What will happen to this repo?
+We will still produce builds of OBS-FTL every now and then as we work on new FTL features. We will release the new features in alpha test builds in this repo before we commit them to official OBS. 
